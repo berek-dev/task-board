@@ -833,7 +833,7 @@
       useBackend(realBackend); showSignin();
     };
     $("#btn-refresh").onclick = () => sync();
-    $$(".btn-lang").forEach((b) => (b.onclick = () => { window.i18n.setLang(window.i18n.lang === "he" ? "en" : "he"); render(); }));
+    $$(".btn-lang").forEach((b) => (b.onclick = () => { window.i18n.setLang(window.i18n.lang === "he" ? "en" : "he"); render(); renderProfiles(); }));
     $("#btn-new").onclick = () => openEditor(null);
     $("#btn-help").onclick = showShortcuts;
     $("#btn-shortcuts-close").onclick = () => $("#shortcuts").close();
@@ -1008,9 +1008,22 @@
 
   let realBackend = null;
   function useBackend(b) { state.backend = b; PRIORITIES = b?.priorities || ALL_PRIORITIES; }
+  function renderProfiles() {
+    const { profiles, profile } = window.TB;
+    $$(".btn-profile").forEach((b) => {
+      b.hidden = !(profile && profiles.length > 1);
+      if (profile) b.textContent = t("profile.switch", { name: profile.name || profile.id });
+      b.onclick = () => window.TB.chooseProfile(null);
+    });
+    $("#profile-list").innerHTML = profiles.map((p) => `<button class="btn primary big" data-profile="${esc(p.id)}" dir="auto">${esc(p.name || p.id)}</button>`).join("");
+    $$("[data-profile]").forEach((b) => (b.onclick = () => window.TB.chooseProfile(b.dataset.profile)));
+  }
   async function start() {
     window.i18n.applyToDom();
     wire();
+    renderProfiles();
+    // Several people set up and this device hasn't said who it is yet.
+    if (window.TB.profiles.length > 1 && !window.TB.profile && !cfg.DEMO_ONLY) { $("#profiles").hidden = false; return; }
     if (!cfg.DEMO_ONLY && "serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
     if (cfg.DEMO_ONLY || new URLSearchParams(location.search).has("demo")) {
       if (cfg.DEMO_ONLY) $("#btn-signout").hidden = true;

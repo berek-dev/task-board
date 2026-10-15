@@ -1,6 +1,6 @@
 // Caches the app shell so it opens instantly and installs as an app.
 // Calendar API calls are never cached: your calendar is always the source of truth.
-const CACHE = "taskboard-v7";
+const CACHE = "taskboard-v8";
 const SHELL = ["./", "index.html", "styles.css", "app.js", "config.js", "i18n.js", "core.js", "backends.js", "manifest.webmanifest", "icons/icon.svg", "vendor/msal-browser.min.js"];
 
 self.addEventListener("install", (e) => {

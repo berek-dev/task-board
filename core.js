@@ -84,16 +84,36 @@
       r.readAsDataURL(file);
     });
   }
+  // Profiles: several people can use the app on one device, each with their own Client IDs and their
+  // own saved sign-in, settings and views. The first profile keeps the plain "tb.*" keys.
+  const GLOBAL_KEYS = new Set(["tb.lang", "tb.profile"]);
+  let scope = "";
+  const scoped = (k) => (scope && !GLOBAL_KEYS.has(k) ? k.replace(/^tb\./, `tb.${scope}.`) : k);
   const safeStore = {
-    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-    del(k) { try { localStorage.removeItem(k); } catch {} },
+    get(k) { try { return JSON.parse(localStorage.getItem(scoped(k))); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(scoped(k), JSON.stringify(v)); } catch {} },
+    del(k) { try { localStorage.removeItem(scoped(k)); } catch {} },
   };
+
+  // Picks this device's profile from TM_CONFIG.PROFILES and copies its settings into TM_CONFIG,
+  // before the app reads them. With several profiles and none chosen yet, the app asks who it is.
+  const profiles = Array.isArray(window.TM_CONFIG?.PROFILES) ? window.TM_CONFIG.PROFILES : [];
+  let profile = null;
+  if (profiles.length) {
+    const saved = safeStore.get("tb.profile");
+    profile = profiles.find((p) => p.id === saved) || (profiles.length === 1 ? profiles[0] : null);
+    if (profile) {
+      Object.assign(window.TM_CONFIG, profile);
+      scope = profile === profiles[0] ? "" : profile.id;
+    }
+  }
+  const chooseProfile = (id) => { if (id) safeStore.set("tb.profile", id); else safeStore.del("tb.profile"); location.reload(); };
 
   window.TB = {
     t, STATUSES, ALL_PRIORITIES, MS_PRIORITIES, PRIORITY_RANK, STATUS_RANK, REPEATS, REMIND_MINUTES, EVENTS_GROUP,
     pad, ymd, today, addDays, toMin, fromMin, plusHour, localTz, esc, newId, isNewId, sameJson,
     labelColor, nextRepeatDate, normalize, AuthError, loadScript, fileToBase64, safeStore,
+    profiles, profile, chooseProfile,
     MAX_ATTACHMENT_BYTES: 3 * 1024 * 1024,
   };
 })();

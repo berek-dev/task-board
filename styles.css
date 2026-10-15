@@ -443,3 +443,7 @@ dialog form > * { min-width: 0; }
 #ask { width: min(420px, calc(100vw - 32px)); }
 .ask p { margin: 0; overflow-wrap: anywhere; }
 .ask input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+
+/* Profile picker */
+.profile-list { display: grid; gap: 10px; width: 100%; }
+.profile-list .btn { width: 100%; }

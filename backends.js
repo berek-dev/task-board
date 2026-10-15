@@ -51,6 +51,7 @@
   /* ================= Google ================= */
   const META_RE = /(?:^|\n)#taskboard ([^\n]*)\s*$/;
   const STORAGE_TOKEN = "tb.token";
+  const STORAGE_MS_ACCOUNT = "tb.msAccount";
   const RRULE = { daily: "FREQ=DAILY", weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", weekly: "FREQ=WEEKLY", monthly: "FREQ=MONTHLY", yearly: "FREQ=YEARLY" };
 
   function parseNotes(raw) {
@@ -307,7 +308,11 @@
       await this.pca.initialize();
       // Finishes a sign-in that came back from the Microsoft login page.
       const res = await this.pca.handleRedirectPromise();
-      this.account = res?.account || this.pca.getAllAccounts()[0] || null;
+      // Remembers which Microsoft account belongs to this profile, so two people on one device stay apart.
+      if (res?.account) safeStore.set(STORAGE_MS_ACCOUNT, res.account.homeAccountId);
+      const mine = safeStore.get(STORAGE_MS_ACCOUNT);
+      this.account = res?.account || (mine && this.pca.getAccountByHomeId(mine))
+        || (window.TB.profiles.length > 1 ? null : this.pca.getAllAccounts()[0]) || null;
     }
     get signedIn() { return !!this.account; }
     // Redirects to the Microsoft login page and comes back signed in.
@@ -319,6 +324,7 @@
     signOut() {
       const account = this.account;
       this.account = null;
+      safeStore.del(STORAGE_MS_ACCOUNT);
       // Clears this app's session only; stays signed in to Microsoft elsewhere.
       this.pca.logoutRedirect({ account, onRedirectNavigate: () => false }).catch(() => {});
     }

@@ -111,6 +111,24 @@ Add the resulting URL as a redirect URI in your app registration (step 2).
 - **iPhone (Safari)**: open the URL → Share → *Add to Home Screen*.
 - **PC (Chrome / Edge)**: install icon in the address bar.
 
+## More than one person
+
+Everyone can use the same address. Each person signs in with their own account and only sees their
+own calendar and tasks. To keep people apart on a shared device, or to give each person their own
+Client IDs, list them under `PROFILES` in `config.js`:
+
+```js
+PROFILES: [
+  { id: "barak", name: "Barak", GOOGLE_CLIENT_ID: "…" },
+  { id: "user2", name: "Second user", GOOGLE_CLIENT_ID: "…" },
+],
+```
+
+The first time the app opens on a device it asks "Who's using Task Board?". Each profile keeps its own
+sign-in, settings and saved views, and the "👤 Name · Switch" button changes person.
+One Google or Microsoft Client ID can also serve everyone: add each person as a Google test user,
+and for Microsoft use a multitenant registration (see microsoft-setup.md).
+
 ## Security
 
 - The app is plain files. There is no server and no database, and no password or secret is in the code:

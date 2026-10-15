@@ -26,6 +26,17 @@
       <button id="btn-demo" class="btn ghost" data-i18n="signin.demo">Try the demo (no account)</button>
       <button class="btn ghost small btn-lang" data-i18n="top.lang">עברית</button>
       <p id="signin-error" class="error" hidden></p>
+      <button class="btn ghost small btn-profile" hidden></button>
+    </div>
+  </section>
+
+  <!-- Who is using this device (when several profiles are set up) -->
+  <section id="profiles" class="signin" hidden>
+    <div class="signin-card">
+      <img src="icons/icon.svg" alt="" width="64" height="64">
+      <h1 data-i18n="profile.who">Who's using Task Board?</h1>
+      <div id="profile-list" class="profile-list"></div>
+      <button class="btn ghost small btn-lang" data-i18n="top.lang">עברית</button>
     </div>
   </section>
 
@@ -46,6 +57,7 @@
         <button id="btn-connect" class="btn ghost small" hidden></button>
         <button id="btn-help" class="btn ghost small icon-text" title="Keyboard shortcuts" data-i18n-title="keys.title">⌨</button>
         <button class="btn ghost small btn-lang" data-i18n="top.lang">עברית</button>
+        <button class="btn ghost small btn-profile" hidden></button>
         <button id="btn-signout" class="btn ghost small" data-i18n="top.signout">Sign out</button>
       </div>
     </header>
