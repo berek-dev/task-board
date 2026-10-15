@@ -72,8 +72,11 @@ registrations at all; then IT has to do steps 1 to 4.
    with the account whose calendar you want to use.
 2. **App registrations → New registration**:
    - Name: "Task Board".
-   - Supported account types: *Accounts in this organizational directory only* for a work account
-     (or *any directory and personal Microsoft accounts* if you also want a personal Outlook.com account).
+   - Supported account types: *Accounts in this organizational directory only* if only people at your
+     company will use it. If someone at another company (for example your spouse) will use it too, choose
+     *Accounts in any organizational directory* (add *and personal Microsoft accounts* for Outlook.com).
+     Each person signs in on their own device and only ever sees their own calendar and tasks;
+     their company's IT may need to approve the app for their account too.
    - Redirect URI: platform **Single-page application (SPA)**, URL = where you'll host the app,
      e.g. `https://<you>.github.io/task-board/` (with the trailing slash). Then under
      Authentication add `http://localhost:8080/` too, for testing on your PC.
@@ -152,7 +155,9 @@ because Google Tasks has no hidden fields. Event status and priority are hidden 
 
 1. https://console.cloud.google.com/ → create a project.
 2. Enable **Google Calendar API** and **Google Tasks API**.
-3. OAuth consent screen: External, scopes `calendar.events` and `tasks`, add yourself as a test user.
+3. OAuth consent screen: External, scopes `calendar.events` and `tasks`, add yourself (and anyone else
+   who will use it, e.g. your spouse) as a test user. A company Google Workspace account may also need
+   its admin to allow the app.
 4. Credentials → OAuth client ID → Web application; add your hosting URL and `http://localhost:8080`
    as Authorized JavaScript origins.
 5. Put the Client ID in `GOOGLE_CLIENT_ID`. Google browser sign-in lasts an hour; tap the yellow
