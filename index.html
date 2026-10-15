@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Security: the app may only load its own files and talk to Microsoft and Google sign-in and APIs. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://www.googleapis.com https://tasks.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://login.microsoftonline.com https://login.live.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="theme-color" content="#5b5bd6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Tasks">
+  <title>Task Board</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Sign-in screen -->
+  <section id="signin" class="signin" hidden>
+    <div class="signin-card">
+      <img src="icons/icon.svg" alt="" width="64" height="64">
+      <h1 data-i18n="app.name">Task Board</h1>
+      <p data-i18n="signin.blurb">Your tasks and events, as a board.</p>
+      <button id="btn-signin-ms" class="btn primary big" data-i18n="signin.microsoft">Sign in with Microsoft</button>
+      <button id="btn-signin-google" class="btn primary big" data-i18n="signin.google">Sign in with Google</button>
+      <button id="btn-demo" class="btn ghost" data-i18n="signin.demo">Try the demo (no account)</button>
+      <button class="btn ghost small btn-lang" data-i18n="top.lang">עברית</button>
+      <p id="signin-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- Main app -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><img src="icons/icon.svg" alt="" width="28" height="28"><span data-i18n="app.name">Task Board</span></div>
+      <input id="search" class="search" type="search" dir="auto" placeholder="Search…" aria-label="Search" data-i18n-placeholder="top.search" data-i18n-aria-label="top.search">
+      <div class="seg views" role="tablist" aria-label="View">
+        <button data-view="table" class="active" data-i18n="top.table">Table</button>
+        <button data-view="board" data-i18n="top.board">Board</button>
+        <button data-view="calendar" data-i18n="top.calendar">Calendar</button>
+        <button data-view="overview" data-i18n="top.overview">Overview</button>
+      </div>
+      <div class="top-actions">
+        <button id="btn-refresh" class="btn icon" title="Sync now" aria-label="Sync now" data-i18n-title="top.sync" data-i18n-aria-label="top.sync">⟳</button>
+        <button id="btn-new" class="btn primary" data-i18n="top.new">+ New</button>
+        <button id="btn-connect" class="btn ghost small" hidden></button>
+        <button id="btn-help" class="btn ghost small icon-text" title="Keyboard shortcuts" data-i18n-title="keys.title">⌨</button>
+        <button class="btn ghost small btn-lang" data-i18n="top.lang">עברית</button>
+        <button id="btn-signout" class="btn ghost small" data-i18n="top.signout">Sign out</button>
+      </div>
+    </header>
+
+    <div class="filters">
+      <div class="seg small" aria-label="Show">
+        <button data-kind="all" class="active" data-i18n="filter.all">All</button>
+        <button data-kind="task" data-i18n="filter.tasks">☑ Tasks</button>
+        <button data-kind="event" data-i18n="filter.events">📅 Events</button>
+      </div>
+      <label class="check"><input id="hide-done" type="checkbox"> <span data-i18n="filter.hideDone">Hide done</span></label>
+      <button id="btn-filters" class="btn ghost small"><span data-i18n="filter.more">Filters</span> <span id="filter-count"></span></button>
+      <span id="sync-state" class="muted"></span>
+    </div>
+
+    <div id="filter-panel" class="filter-panel" hidden>
+      <label><span data-i18n="col.status">Status</span> <select id="f-status"></select></label>
+      <label><span data-i18n="col.priority">Priority</span> <select id="f-priority"></select></label>
+      <label><span data-i18n="col.date">Date</span> <select id="f-due"></select></label>
+      <label><span data-i18n="filter.label">Label</span> <select id="f-label"></select></label>
+      <label class="table-only"><span data-i18n="filter.groupBy">Group by</span> <select id="f-group"></select></label>
+      <label><span data-i18n="filter.sortBy">Sort by</span> <select id="f-sort"></select></label>
+      <button id="btn-clear-filters" class="btn ghost small" data-i18n="filter.clear">Clear filters</button>
+    </div>
+
+    <div id="views-bar" class="views-bar"></div>
+
+    <div id="banner" class="banner" hidden></div>
+    <main id="view"></main>
+
+    <div id="bulk-bar" class="bulk-bar" hidden>
+      <strong id="bulk-count"></strong>
+      <select id="bulk-status" aria-label="Status"></select>
+      <select id="bulk-priority" aria-label="Priority"></select>
+      <input id="bulk-date" type="date" aria-label="Date">
+      <select id="bulk-list" aria-label="List"></select>
+      <input id="bulk-label" dir="auto" data-i18n-placeholder="bulk.addLabel" placeholder="+ Label" aria-label="Label">
+      <button id="bulk-delete" class="btn danger small" data-i18n="edit.delete">Delete</button>
+      <button id="bulk-clear" class="btn ghost small" data-i18n="bulk.clear">Clear selection</button>
+    </div>
+  </div>
+
+  <!-- Edit dialog -->
+  <dialog id="editor">
+    <form id="edit-form" method="dialog">
+      <h2 id="edit-title">New item</h2>
+      <label><span data-i18n="edit.title">Title</span> <input name="title" required autocomplete="off" dir="auto"></label>
+      <div class="row2">
+        <label><span data-i18n="edit.type">Type</span>
+          <select name="source">
+            <option value="task" data-i18n="edit.typeTask">Task</option>
+            <option value="event" data-i18n="edit.typeEvent">Calendar event</option>
+          </select>
+        </label>
+        <label id="list-field"><span data-i18n="edit.list">List</span> <select name="containerId"></select></label>
+      </div>
+      <div class="row2">
+        <label><span data-i18n="edit.status">Status</span> <select name="status"></select></label>
+        <label><span data-i18n="edit.priority">Priority</span> <select name="priority"></select></label>
+      </div>
+      <div class="row3">
+        <label><span data-i18n="edit.date">Date</span> <input name="date" type="date"></label>
+        <label class="ev-only"><span data-i18n="edit.start">Start</span> <input name="startTime" type="time"></label>
+        <label class="ev-only"><span data-i18n="edit.end">End</span> <input name="endTime" type="time"></label>
+      </div>
+      <p class="hint ev-only" data-i18n="edit.allDayHint">Leave the times empty for an all-day event.</p>
+      <div class="row2">
+        <label id="repeat-field"><span data-i18n="edit.repeat">Repeat</span> <select name="repeat"></select></label>
+        <label id="remind-field"><span data-i18n="edit.remind">Reminder</span>
+          <input name="remindTime" type="time" class="task-only">
+          <select name="remindMin" class="ev-only"></select>
+        </label>
+      </div>
+      <p id="series-hint" class="hint" data-i18n="edit.seriesHint" hidden></p>
+
+      <div id="labels-field" class="field">
+        <span class="field-label" data-i18n="edit.labels">Labels</span>
+        <div class="chips-edit"><span id="label-chips"></span><input id="label-input" list="label-options" dir="auto" data-i18n-placeholder="edit.labelAdd" placeholder="+ Add label"></div>
+        <datalist id="label-options"></datalist>
+      </div>
+
+      <div id="checklist-field" class="field task-only">
+        <span class="field-label"><span data-i18n="edit.checklist">Checklist</span> <span id="checklist-progress" class="muted"></span></span>
+        <ul id="checklist" class="checklist"></ul>
+        <input id="checklist-add" dir="auto" data-i18n-placeholder="edit.checklistAdd" placeholder="+ Add a step">
+      </div>
+
+      <label><span data-i18n="edit.notes">Notes</span> <textarea name="notes" rows="3" dir="auto"></textarea></label>
+
+      <div id="links-field" class="field task-only">
+        <span class="field-label" data-i18n="edit.links">Links</span>
+        <ul id="links" class="linklist"></ul>
+        <div class="link-add">
+          <input id="link-url" type="url" inputmode="url" placeholder="https://…" aria-label="URL">
+          <input id="link-title" dir="auto" data-i18n-placeholder="edit.linkTitle" placeholder="Title (optional)">
+          <button type="button" id="btn-link-add" class="btn ghost small" data-i18n="edit.linkAdd">Add</button>
+        </div>
+      </div>
+
+      <div id="files-field" class="field">
+        <span class="field-label" data-i18n="edit.files">Files</span>
+        <ul id="files" class="linklist"></ul>
+        <p id="files-hint" class="hint" hidden></p>
+        <label class="btn ghost small file-btn"><span data-i18n="edit.fileAdd">+ Attach file</span><input id="file-input" type="file" hidden></label>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" id="btn-delete" class="btn danger" data-i18n="edit.delete">Delete</button>
+        <button type="button" id="btn-block" class="btn ghost" data-i18n="edit.block">📅 Block time</button>
+        <span class="spacer"></span>
+        <button type="button" id="btn-cancel" class="btn ghost" data-i18n="edit.cancel">Cancel</button>
+        <button type="submit" class="btn primary" data-i18n="edit.save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Keyboard shortcuts -->
+  <dialog id="shortcuts">
+    <div class="shortcuts">
+      <h2 data-i18n="keys.title">Keyboard shortcuts</h2>
+      <dl id="shortcut-list"></dl>
+      <div class="dialog-actions"><span class="spacer"></span><button class="btn primary" id="btn-shortcuts-close" data-i18n="keys.close">Close</button></div>
+    </div>
+  </dialog>
+
+  <!-- Confirm / name prompt -->
+  <dialog id="ask">
+    <form method="dialog" class="ask">
+      <p id="ask-msg"></p>
+      <input id="ask-input" dir="auto" autocomplete="off" hidden>
+      <div class="dialog-actions"><span class="spacer"></span><button value="cancel" class="btn ghost" data-i18n="edit.cancel">Cancel</button><button value="ok" id="ask-ok" class="btn primary">OK</button></div>
+    </form>
+  </dialog>
+
+  <div id="menu" class="menu" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="i18n.js"></script>
+  <script src="core.js"></script>
+  <script src="backends.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
