@@ -9,7 +9,7 @@ window.TM_CONFIG = {
   MS_TENANT: "common",
 
   // Google (Google Calendar + Google Tasks): the OAuth Client ID from Google Cloud (see README.md).
-  GOOGLE_CLIENT_ID: "YOUR_CLIENT_ID.apps.googleusercontent.com",
+  GOOGLE_CLIENT_ID: "79752309754-ptmlufk15tf041o2nl20jrk60kd0ft6i.apps.googleusercontent.com",
   CALENDAR_ID: "primary",
 
   // How far back / ahead to load calendar events, in days.
