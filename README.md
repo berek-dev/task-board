@@ -32,6 +32,12 @@ browser language is Hebrew; the English / עברית button in the top bar switc
   status, priority, due date or label; sort by date, priority, status or name. Ready-made views
   (This week, Overdue, Stuck, High priority) and your own saved views. Saved views are kept on each device.
 - **Links and files:** web links on tasks, and file attachments (up to 3 MB) on tasks and events.
+- **Priorities:** a tab with all your open tasks in one list. Drag ⠿ (or tap ⤒) to put them in order; the
+  order is saved with each task (an Outlook To Do extension, or the Google Tasks notes line), so it syncs to
+  every device. "My order" in the table's Sort by uses it too.
+- **Reminders:** on the due date at a time you pick, or a one-time reminder at any date and time.
+- **On a phone:** tabs at the bottom, a big + New button, full-screen editing, and on the board tap a card's
+  status (or long-press the card) to move it, since dragging doesn't work well with fingers.
 - **Bulk edit:** tick several rows in the table, then change status, priority, date, list or label, or delete them together.
 - **Keyboard shortcuts (PC):** N new, / search, 1–4 switch screen, F filters, R sync, ← → and T in the
   calendar, Esc clear selection, Ctrl+Enter save, ? shows the list.

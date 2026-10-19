@@ -62,7 +62,7 @@
   // Every item has the same shape whichever backend it came from.
   const normalize = (item) => ({
     notes: "", status: "todo", priority: "", date: "", startTime: "", endTime: "", link: "",
-    checklist: [], repeat: "", remind: "", isOccurrence: false, labels: [], links: [], hasAttachments: false,
+    checklist: [], repeat: "", remind: "", isOccurrence: false, labels: [], links: [], hasAttachments: false, rank: null,
     ...item,
   });
 

@@ -51,6 +51,7 @@
   /* ================= Google ================= */
   const META_RE = /(?:^|\n)#taskboard ([^\n]*)\s*$/;
   const STORAGE_TOKEN = "tb.token";
+  const MS_RANK_EXT = "com.taskboard.meta";
   const STORAGE_MS_ACCOUNT = "tb.msAccount";
   const RRULE = { daily: "FREQ=DAILY", weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", weekly: "FREQ=WEEKLY", monthly: "FREQ=MONTHLY", yearly: "FREQ=YEARLY" };
 
@@ -62,10 +63,11 @@
     for (const part of m[1].trim().split(/\s+/)) { const [k, v] = part.split("="); if (k && v) meta[k] = v; }
     return { notes: text.slice(0, m.index).replace(/\s+$/, ""), meta };
   }
-  function buildNotes(notes, status, priority) {
+  function buildNotes(notes, status, priority, rank) {
     const parts = [];
     if (status && status !== "todo" && status !== "done") parts.push(`status=${status}`);
     if (priority) parts.push(`priority=${priority}`);
+    if (rank != null) parts.push(`rank=${rank}`);
     const body = (notes || "").replace(/\s+$/, "");
     if (!parts.length) return body;
     return (body ? body + "\n\n" : "") + "#taskboard " + parts.join(" ");
@@ -178,13 +180,14 @@
       title: x.title || "", notes,
       status: done ? "done" : (meta.status && meta.status !== "done" ? meta.status : "todo"),
       priority: meta.priority || "",
+      rank: meta.rank != null && isFinite(meta.rank) ? Number(meta.rank) : null,
       date: x.due ? x.due.slice(0, 10) : "", link: x.webViewLink || "",
     });
   }
   function itemToGTask(item) {
     return {
       title: item.title,
-      notes: buildNotes(item.notes, item.status, item.priority),
+      notes: buildNotes(item.notes, item.status, item.priority, item.rank),
       status: item.status === "done" ? "completed" : "needsAction",
       due: item.date ? item.date + "T00:00:00.000Z" : null,
     };
@@ -375,8 +378,19 @@
 
     async loadTasks(listId) {
       const base = this.taskBase(listId) + "?$top=100";
-      try { return await this.pages(base + "&$expand=checklistItems,linkedResources"); }
-      catch (e) { if (e.auth) throw e; return this.pages(base); }
+      const tries = [`&$expand=checklistItems,linkedResources,extensions($filter=id eq '${MS_RANK_EXT}')`, "&$expand=checklistItems,linkedResources", ""];
+      for (let i = 0; ; i++) {
+        try { return await this.pages(base + tries[i]); }
+        catch (e) { if (e.auth || i === tries.length - 1) throw e; }
+      }
+    }
+    // The order from the Priorities tab, kept in a small hidden extension on the To Do task.
+    async saveRank(listId, taskId, rank, hadRank) {
+      const base = this.taskBase(listId, taskId) + "/extensions";
+      const patch = () => this.api("PATCH", `${base}/${enc(MS_RANK_EXT)}`, { rank });
+      const post = () => this.api("POST", base, { "@odata.type": "microsoft.graph.openTypeExtension", extensionName: MS_RANK_EXT, rank });
+      try { await (hadRank ? patch() : post()); }
+      catch (e) { if (e.auth) throw e; await (hadRank ? post() : patch()); }
     }
     async load() {
       const lists = await this.pages("/me/todo/lists");
@@ -416,7 +430,8 @@
     async create(item) {
       if (item.source === "task") {
         const x = await this.api("POST", this.taskBase(item.containerId), itemToMsTask(null, item));
-        return { ...msTaskToItem(x, item.containerId), ...(await this.syncTaskChildren(item.containerId, x.id, null, item)) };
+        if (item.rank != null) await this.saveRank(item.containerId, x.id, item.rank, false);
+        return { ...msTaskToItem(x, item.containerId), rank: item.rank ?? null, ...(await this.syncTaskChildren(item.containerId, x.id, null, item)) };
       }
       const e = await this.api("POST", "/me/events", itemToMsEvent(null, item));
       return { ...msEventToItem(e), status: item.status };
@@ -432,7 +447,8 @@
         const saved = Object.keys(body).length
           ? msTaskToItem(await this.api("PATCH", this.taskBase(item.containerId, item.id), body), item.containerId)
           : { ...item };
-        return { ...saved, ...(await this.syncTaskChildren(item.containerId, item.id, prev, item)) };
+        if (item.rank != null && item.rank !== prev.rank) await this.saveRank(item.containerId, item.id, item.rank, prev.rank != null);
+        return { ...saved, rank: item.rank ?? null, ...(await this.syncTaskChildren(item.containerId, item.id, prev, item)) };
       }
       const body = itemToMsEvent(prev, item);
       if (!Object.keys(body).length) return { ...item };
@@ -472,6 +488,7 @@
       labels: x.categories || [],
       repeat: msRepeat(x.recurrence),
       remind: x.isReminderOn ? msReminder(x.reminderDateTime, date) : "",
+      rank: (() => { const r = (x.extensions || []).find((e) => e.id === MS_RANK_EXT || e.extensionName === MS_RANK_EXT)?.rank; return typeof r === "number" ? r : null; })(),
       hasAttachments: !!x.hasAttachments,
     });
   }

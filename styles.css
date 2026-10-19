@@ -512,3 +512,35 @@ dialog form > * { min-width: 0; }
   input, select, textarea { font-size: 16px; }
   .btn { min-height: 40px; }
 }
+
+/* ---------- Priorities ---------- */
+.prio { max-width: 760px; margin: 0 auto; }
+.prio-hint { margin: 0 0 12px; font-size: 13px; }
+.prio .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+.prio-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.prio-item {
+  display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow);
+  padding: 8px 10px; border-inline-start: 4px solid var(--group-color, var(--accent)); transition: transform .15s ease;
+}
+.prio-item.unranked { opacity: .85; }
+.prio-item.dragging { transition: none; z-index: 5; position: relative; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+body.prio-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+.prio-handle {
+  flex: none; display: grid; place-items: center; width: 34px; height: 40px; font-size: 22px; color: var(--muted);
+  cursor: grab; touch-action: none; border-radius: 8px; user-select: none; -webkit-user-select: none;
+}
+.prio-handle:hover { background: var(--surface-2); }
+.prio-num { flex: none; min-width: 26px; height: 26px; border-radius: 99px; background: var(--surface-2); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.prio-item:not(.unranked) .prio-num { background: var(--accent); color: var(--accent-text); }
+.prio-main { flex: 1; min-width: 0; cursor: pointer; }
+.prio-main .t { font-weight: 500; overflow-wrap: anywhere; }
+.prio-main .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; color: var(--muted); margin-top: 2px; align-items: center; }
+.prio-main .meta .overdue { color: var(--danger); font-weight: 600; }
+.prio-top { flex: none; border: 0; background: none; color: var(--muted); font-size: 18px; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; }
+.prio-top:hover { background: var(--surface-2); color: var(--accent); }
+.prio-sep { list-style: none; font-size: 12px; font-weight: 600; color: var(--muted); padding: 10px 4px 2px; text-transform: none; }
+@media (max-width: 720px) {
+  .topbar .seg.views { grid-template-columns: repeat(5, 1fr); }
+  .topbar .seg.views button { font-size: 11px; }
+  .topbar .seg.views [data-view="priorities"]::before { content: "⇅"; }
+}

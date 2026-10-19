@@ -76,6 +76,12 @@
     return true;
   }
   const visibleItems = (opts) => state.items.filter((i) => matches(i, opts));
+  // "My order" from the Priorities tab: ordered tasks first, then the rest by priority and date.
+  function byRank(a, b) {
+    const ra = a.rank ?? Infinity, rb = b.rank ?? Infinity;
+    if (ra !== rb) return ra < rb ? -1 : 1;
+    return PRIORITY_RANK[a.priority || ""] - PRIORITY_RANK[b.priority || ""] || (a.date || "9999").localeCompare(b.date || "9999");
+  }
   function sortItems(items) {
     const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999") || (a.startTime || "").localeCompare(b.startTime || "");
     const doneLast = (a, b) => (a.status === "done") - (b.status === "done");
@@ -84,6 +90,7 @@
       priority: (a, b) => doneLast(a, b) || PRIORITY_RANK[a.priority || ""] - PRIORITY_RANK[b.priority || ""] || byDate(a, b),
       status: (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDate(a, b),
       title: (a, b) => 0,
+      rank: (a, b) => doneLast(a, b) || byRank(a, b),
     }[prefs.sortBy] || ((a, b) => 0);
     return items.slice().sort((a, b) => cmp(a, b) || a.title.localeCompare(b.title));
   }
@@ -130,7 +137,7 @@
 
     const prevScroll = $(".cal-scroll")?.scrollTop;
     const view = $("#view");
-    view.innerHTML = { board: renderBoard, calendar: renderCalendar, overview: renderOverview }[prefs.view]?.() ?? renderTable();
+    view.innerHTML = { board: renderBoard, calendar: renderCalendar, overview: renderOverview, priorities: renderPriorities }[prefs.view]?.() ?? renderTable();
     const sc = $(".cal-scroll");
     if (sc) sc.scrollTop = prevScroll ?? (8 - START_H) * HOUR_PX;
     renderBulkBar();
@@ -150,7 +157,7 @@
     fillSelect($("#f-due"), [["", t("filter.any")], ...["overdue", "today", "week", "nodate"].map((d) => [d, t("due." + d)])], f.due);
     fillSelect($("#f-label"), [["", t("filter.any")], ...allLabels().map((l) => [l, l])], f.label);
     fillSelect($("#f-group"), ["list", "status", "priority", "due", "label"].map((g) => [g, t("group.by." + g)]), prefs.groupBy);
-    fillSelect($("#f-sort"), ["date", "priority", "status", "title"].map((s) => [s, t("sort." + s)]), prefs.sortBy);
+    fillSelect($("#f-sort"), ["date", "rank", "priority", "status", "title"].map((s) => [s, t("sort." + s)]), prefs.sortBy);
     $$(".table-only", $("#filter-panel")).forEach((el) => (el.hidden = prefs.view !== "table"));
     const n = Object.values(f).filter(Boolean).length;
     $("#filter-count").textContent = n ? `(${n})` : "";
@@ -356,6 +363,103 @@
       state.calAnchor = ymd(new Date(a.getFullYear(), a.getMonth() + dir, 1));
     } else state.calAnchor = addDays(state.calAnchor, 7 * dir);
     render();
+  }
+
+  /* ----- Priorities: one list of open tasks, put in order by dragging ----- */
+  const prioItems = () => visibleItems().filter((i) => i.source === "task" && i.status !== "done").sort((a, b) => byRank(a, b) || a.title.localeCompare(b.title));
+  function renderPriorities() {
+    const items = prioItems();
+    if (!items.length) return `<div class="prio"><p class="empty">${esc(t("prio.empty"))}</p></div>`;
+    const firstUnranked = items.findIndex((i) => i.rank == null);
+    return `<div class="prio"><p class="hint prio-hint">${esc(t("prio.hint"))}</p><ol class="prio-list">${items.map((i, n) => {
+      const p = priorityOf(i.priority), group = groupById(i.containerId);
+      return `${n === firstUnranked && n > 0 ? `<li class="prio-sep">${esc(t("prio.unranked"))}</li>` : ""}
+      <li class="prio-item${i.rank == null ? " unranked" : ""}" data-key="${esc(i.key)}" style="--group-color:${groupColor(i.containerId)}">
+        <span class="prio-handle" role="button" aria-label="${esc(t("prio.handle"))}" title="${esc(t("prio.handle"))}">⠿</span>
+        <span class="prio-num">${n + 1}</span>
+        <div class="prio-main" data-open="${esc(i.key)}">
+          <div class="t" dir="auto">${esc(i.title)}</div>
+          <div class="meta">${group ? `<span>${esc(groupTitle(group))}</span>` : ""}${i.date ? `<span class="${isOverdue(i) ? "overdue" : ""}">${esc(fmtDate(i))}</span>` : ""}${i.priority ? `<span class="tag" style="background:${p.color}">${p.label}</span>` : ""}</div>
+        </div>
+        ${n > 0 ? `<button class="prio-top" data-prio-top="${esc(i.key)}" title="${esc(t("prio.top"))}" aria-label="${esc(t("prio.top"))}">⤒</button>` : ""}
+      </li>`;
+    }).join("")}</ol></div>`;
+  }
+  // Gives the moved task a rank between its new neighbours (one save), ranking any unordered tasks above it.
+  async function moveRank(key, to) {
+    const list = prioItems();
+    const from = list.findIndex((i) => i.key === key);
+    if (from < 0 || to === from) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    const writes = new Map();
+    let last = 0;
+    for (let k = 0; k < to; k++) {
+      const it = list[k];
+      if (it.rank == null || it.rank <= last) writes.set(it.key, last + 1);
+      last = writes.get(it.key) ?? it.rank;
+    }
+    const next = list[to + 1];
+    let rank = next && next.rank != null && next.rank > last ? (last + next.rank) / 2 : last + 1;
+    if (next && next.rank != null && next.rank - last < 1e-6) {
+      // Ranks got too close together: renumber the ordered part 1, 2, 3...
+      list.forEach((it, k) => { if (k <= to || it.rank != null) writes.set(it.key, k + 1); });
+      rank = to + 1;
+    }
+    writes.set(moved.key, Math.round(rank * 1e6) / 1e6);
+    for (const [k, r] of writes) {
+      const it = findItem(k);
+      if (it && it.rank !== r) await saveItem(it, { ...it, rank: r });
+    }
+  }
+  // Pointer-based drag (mouse and touch) on the ⠿ handle. The list doesn't change until you let go.
+  function wirePrioDrag(view) {
+    let drag = null;
+    view.addEventListener("pointerdown", (e) => {
+      const handle = e.target.closest(".prio-handle");
+      if (!handle || e.button > 0) return;
+      e.preventDefault();
+      const li = handle.closest(".prio-item");
+      const rows = $$(".prio-item", view);
+      const tops = rows.map((r) => r.getBoundingClientRect().top + scrollY);
+      drag = { li, rows, tops, from: rows.indexOf(li), to: rows.indexOf(li), startY: e.clientY + scrollY, y: e.clientY, h: li.offsetHeight + 8, id: e.pointerId };
+      try { handle.setPointerCapture(e.pointerId); } catch {}
+      li.classList.add("dragging");
+      document.body.classList.add("prio-dragging");
+      const tick = () => {
+        if (!drag) return;
+        if (drag.y < 90) scrollBy(0, -10); else if (drag.y > innerHeight - 140) scrollBy(0, 10);
+        layout(); drag.raf = requestAnimationFrame(tick);
+      };
+      drag.raf = requestAnimationFrame(tick);
+    });
+    function layout() {
+      const { li, rows, tops, from, startY, h } = drag;
+      const dy = drag.y + scrollY - startY;
+      li.style.transform = `translateY(${dy}px)`;
+      const center = tops[from] + dy + li.offsetHeight / 2;
+      let to = 0;
+      rows.forEach((r, k) => { if (k !== from && tops[k] + r.offsetHeight / 2 < center) to++; });
+      drag.to = to;
+      rows.forEach((r, k) => {
+        if (k === from) return;
+        const shift = from < to && k > from && k <= to ? -h : from > to && k >= to && k < from ? h : 0;
+        r.style.transform = shift ? `translateY(${shift}px)` : "";
+      });
+    }
+    view.addEventListener("pointermove", (e) => { if (drag && e.pointerId === drag.id) drag.y = e.clientY; });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      cancelAnimationFrame(drag.raf);
+      const { rows, from, to, li } = drag;
+      drag = null;
+      rows.forEach((r) => (r.style.transform = ""));
+      li.classList.remove("dragging");
+      document.body.classList.remove("prio-dragging");
+      if (to !== from) moveRank(li.dataset.key, to);
+    };
+    view.addEventListener("pointerup", end);
+    view.addEventListener("pointercancel", end);
   }
 
   /* ----- Overview ----- */
@@ -781,7 +885,7 @@
 
   /* ---------- Keyboard shortcuts ---------- */
   const SHORTCUTS = [
-    ["N", "keys.new"], ["/", "keys.search"], ["1 – 4", "keys.views"], ["F", "keys.filters"], ["R", "keys.sync"],
+    ["N", "keys.new"], ["/", "keys.search"], ["1 – 5", "keys.views"], ["F", "keys.filters"], ["R", "keys.sync"],
     ["← →", "keys.calNav"], ["T", "keys.today"], ["Esc", "keys.escape"], ["Ctrl + Enter", "keys.save"], ["?", "keys.help"],
   ];
   function showShortcuts() {
@@ -802,7 +906,8 @@
       case "Digit1": setView("table"); break;
       case "Digit2": setView("board"); break;
       case "Digit3": setView("calendar"); break;
-      case "Digit4": setView("overview"); break;
+      case "Digit4": setView("priorities"); break;
+      case "Digit5": setView("overview"); break;
       case "KeyF": state.filtersOpen = !state.filtersOpen; render(); break;
       case "KeyR": sync(); break;
       case "KeyT": if (prefs.view === "calendar") calNavigate(0); break;
@@ -912,6 +1017,7 @@
 
     // Main view interactions
     const view = $("#view");
+    wirePrioDrag(view);
     // Long-press a card or row on a phone: choose where to move it.
     let pressTimer = null, pressStart = null, longPressed = false;
     view.addEventListener("pointerdown", (e) => {
@@ -937,6 +1043,8 @@
       if (longPressed) { longPressed = false; e.preventDefault(); e.stopPropagation(); return; }
       const menuBtn = e.target.closest("[data-menu]");
       if (menuBtn) { e.stopPropagation(); return openMenu(menuBtn, menuBtn.dataset.menu, findItem(menuBtn.dataset.key)); }
+      const top = e.target.closest("[data-prio-top]");
+      if (top) return moveRank(top.dataset.prioTop, 0);
       const jump = e.target.closest("[data-col-jump]");
       if (jump) {
         const board = $(".board"), col = $(`#col-${jump.dataset.colJump}`);
