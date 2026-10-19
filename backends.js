@@ -251,11 +251,17 @@
     if (/^utc$/i.test(due.timeZone || "") && dt.slice(11, 16) !== "00:00") return ymd(new Date(dt.slice(0, 19) + "Z"));
     return dt.slice(0, 10);
   }
-  function msReminderTime(rem) {
+  // A To Do reminder as the board stores it: "HH:MM" when it is on the due date,
+  // otherwise a one-time "YYYY-MM-DDTHH:MM" in local time.
+  function msReminder(rem, dueDate) {
     if (!rem?.dateTime) return "";
     const dt = rem.dateTime;
-    if (/^utc$/i.test(rem.timeZone || "")) { const d = new Date(dt.slice(0, 19) + "Z"); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
-    return dt.slice(11, 16);
+    let local = dt.slice(0, 16);
+    if (/^utc$/i.test(rem.timeZone || "")) {
+      const d = new Date(dt.slice(0, 19) + "Z");
+      local = `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    return dueDate && local.slice(0, 10) === dueDate ? local.slice(11, 16) : local;
   }
   function msRepeat(rec) {
     const p = rec?.pattern;
@@ -454,17 +460,18 @@
   }
 
   function msTaskToItem(x, listId) {
+    const date = msDueDate(x.dueDateTime);
     return normalize({
       key: "task:" + x.id, id: x.id, source: "task", containerId: listId,
       title: x.title || "", notes: bodyText(x.body),
       status: FROM_MS_STATUS[x.status] || "todo",
       priority: msPriority(x.importance),
-      date: msDueDate(x.dueDateTime),
+      date,
       checklist: (x.checklistItems || []).map((c) => ({ id: c.id, text: c.displayName || "", done: !!c.isChecked })),
       links: (x.linkedResources || []).filter((r) => r.webUrl).map((r) => ({ id: r.id, url: r.webUrl, title: r.displayName || "" })),
       labels: x.categories || [],
       repeat: msRepeat(x.recurrence),
-      remind: x.isReminderOn ? msReminderTime(x.reminderDateTime) : "",
+      remind: x.isReminderOn ? msReminder(x.reminderDateTime, date) : "",
       hasAttachments: !!x.hasAttachments,
     });
   }
@@ -477,9 +484,11 @@
     if (changed(prev, item, "notes")) out.body = { contentType: "text", content: item.notes || "" };
     if (changed(prev, item, "labels")) out.categories = item.labels || [];
     if (changed(prev, item, "repeat") || (item.repeat && changed(prev, item, "date"))) out.recurrence = msRecurrence(item.repeat, item.date);
-    if (changed(prev, item, "remind") || (item.remind && changed(prev, item, "date"))) {
+    // A one-time reminder ("YYYY-MM-DDTHH:MM") stays put; a due-date reminder ("HH:MM") moves with the date.
+    const oneTime = (item.remind || "").includes("T");
+    if (changed(prev, item, "remind") || (item.remind && !oneTime && changed(prev, item, "date"))) {
       out.isReminderOn = !!item.remind;
-      if (item.remind) out.reminderDateTime = { dateTime: `${item.date || today()}T${item.remind}:00`, timeZone: localTz() };
+      if (item.remind) out.reminderDateTime = { dateTime: oneTime ? `${item.remind}:00` : `${item.date || today()}T${item.remind}:00`, timeZone: localTz() };
     }
     return out;
   }
@@ -589,7 +598,7 @@
       this.items.push(it);
       // Like To Do: completing a repeating task creates the next one.
       if (it.source === "task" && it.repeat && it.status === "done" && prev.status !== "done") {
-        await this.create({ ...it, status: "todo", date: nextRepeatDate(it.date, it.repeat), checklist: it.checklist.map((c) => ({ ...c, id: newId(), done: false })) });
+        await this.create({ ...it, status: "todo", date: nextRepeatDate(it.date, it.repeat), remind: (it.remind || "").includes("T") ? "" : it.remind, checklist: it.checklist.map((c) => ({ ...c, id: newId(), done: false })) });
         it.repeat = "";
       }
       return structuredClone(it);

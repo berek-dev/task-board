@@ -127,8 +127,12 @@
       <div class="row2">
         <label id="repeat-field"><span data-i18n="edit.repeat">Repeat</span> <select name="repeat"></select></label>
         <label id="remind-field"><span data-i18n="edit.remind">Reminder</span>
-          <input name="remindTime" type="time" class="task-only">
-          <select name="remindMin" class="ev-only"></select>
+          <span class="remind-ctl">
+            <select name="remindMode" class="task-only" aria-label="Reminder"></select>
+            <input name="remindTime" type="time" class="task-only" aria-label="Time">
+            <input name="remindAt" type="datetime-local" class="task-only" aria-label="Date and time">
+            <select name="remindMin" class="ev-only"></select>
+          </span>
         </label>
       </div>
       <p id="series-hint" class="hint" data-i18n="edit.seriesHint" hidden></p>

@@ -31,6 +31,8 @@
   const savePrefs = () => safeStore.set(STORAGE_PREFS, prefs);
   let PRIORITIES = ALL_PRIORITIES;
   // What the account supports; pass an item or group id to ask about the account that owns it.
+  // Phones and tablets: no drag and drop (it fights with scrolling); tap or long-press instead.
+  const TOUCH = matchMedia("(pointer: coarse)").matches;
   const caps = (x) => (x !== undefined && state.backend?.capsFor ? state.backend.capsFor(x) : state.backend?.caps) || {};
   const ACCOUNT_NAMES = { microsoft: "Microsoft", google: "Google" };
   const groupById = (id) => state.groups.find((g) => g.id === id);
@@ -103,7 +105,11 @@
       out.push(`<span class="badge${d === i.checklist.length ? " full" : ""}" title="${esc(t("edit.checklist"))}">☑ ${d}/${i.checklist.length}</span>`);
     }
     if (i.repeat || i.isOccurrence) out.push(`<span class="badge" title="${esc(t("badge.repeat"))}">🔁</span>`);
-    if (i.remind) out.push(`<span class="badge" title="${esc(t("badge.remind"))}">🔔</span>`);
+    if (i.remind) {
+      const once = i.source === "task" && i.remind.includes("T");
+      const when = once ? new Date(i.remind).toLocaleString(window.i18n.locale || [], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+      out.push(`<span class="badge" title="${esc(once ? t("remind.when", { when }) : t("badge.remind"))}">🔔${once ? " " + esc(when) : ""}</span>`);
+    }
     if (i.links?.length) out.push(`<span class="badge" title="${esc(t("edit.links"))}">🔗 ${i.links.length}</span>`);
     if (i.hasAttachments) out.push(`<span class="badge" title="${esc(t("edit.files"))}">📎</span>`);
     if (labels) for (const l of i.labels || []) out.push(labelChip(l));
@@ -221,9 +227,11 @@
   function renderBoard() {
     const items = visibleItems();
     const cols = STATUSES.filter((s) => !(prefs.hideDone && s.id === "done"));
-    return `<div class="board">${cols.map((s) => {
+    // Phone: one column per screen; these tabs jump between them.
+    const tabs = `<div class="col-tabs">${cols.map((s) => `<button data-col-jump="${s.id}" style="--c:${s.color}">${s.label} <b>${items.filter((i) => i.status === s.id).length}</b></button>`).join("")}</div>`;
+    return tabs + `<div class="board">${cols.map((s) => {
       const cards = sortItems(items.filter((i) => i.status === s.id));
-      return `<div class="col" data-drop="${s.id}">
+      return `<div class="col" data-drop="${s.id}" id="col-${s.id}">
         <div class="col-head" style="background:${s.color}"><span>${s.label}</span><span>${cards.length}</span></div>
         ${cards.map(cardHtml).join("")}
       </div>`;
@@ -232,8 +240,10 @@
   function cardHtml(i) {
     const p = priorityOf(i.priority);
     const group = state.groups.find((g) => g.id === i.containerId);
-    return `<div class="card" draggable="true" data-drag data-open="${esc(i.key)}" data-key="${esc(i.key)}" style="--group-color:${groupColor(i.containerId)}">
-      <div class="t" dir="auto">${i.source === "event" ? "📅 " : ""}${esc(i.title)}</div>
+    const st = statusOf(i.status);
+    return `<div class="card" draggable="${TOUCH ? "false" : "true"}" data-drag data-open="${esc(i.key)}" data-key="${esc(i.key)}" style="--group-color:${groupColor(i.containerId)}">
+      <div class="card-top"><div class="t" dir="auto">${i.source === "event" ? "📅 " : ""}${esc(i.title)}</div>
+        <button class="card-status" data-menu="status" data-key="${esc(i.key)}" style="background:${st.color}" aria-label="${esc(t("board.move"))}" title="${esc(t("board.move"))}">${st.label} ▾</button></div>
       <div class="meta">
         ${group ? `<span>${esc(groupTitle(group))}</span>` : ""}
         ${i.date ? `<span class="${isOverdue(i) ? "overdue" : ""}">${esc(fmtDate(i))}</span>` : ""}
@@ -493,6 +503,7 @@
     fillSelect(f.elements.priority, PRIORITIES.map((p) => [p.id, p.id ? p.label : t("priority.noneOption")]), "");
     fillSelect(f.elements.repeat, REPEATS.map((r) => [r, t("repeat." + (r || "none"))]), "");
     fillSelect(f.elements.remindMin, REMIND_MINUTES.map((m) => [m, t("remind." + (m || "none"))]), "");
+    fillSelect(f.elements.remindMode, [["", t("remind.none")], ["due", t("remind.onDue")], ["custom", t("remind.custom")]], "");
     const v = item ? structuredClone(item) : normalize({
       source: prefs.kind === "event" ? "event" : "task",
       title: "",
@@ -503,7 +514,10 @@
     if (!taskGroups.length) v.source = "event";
     f.elements.source.value = v.source;
     fillContainers(v.source, v.containerId);
-    f.elements.remindTime.value = v.source === "task" ? v.remind || "" : "";
+    const taskRemind = v.source === "task" ? v.remind || "" : "";
+    f.elements.remindMode.value = !taskRemind ? "" : taskRemind.includes("T") ? "custom" : "due";
+    f.elements.remindTime.value = taskRemind.includes("T") ? "" : taskRemind;
+    f.elements.remindAt.value = taskRemind.includes("T") ? taskRemind : "";
     f.elements.remindMin.value = v.source === "event" ? v.remind || "" : "";
     ed.checklist = structuredClone(v.checklist || []);
     ed.labels = [...(v.labels || [])];
@@ -541,6 +555,7 @@
     const show = (el, on) => (el.style.display = on ? "" : "none");
     show($("#repeat-field"), isTask ? c.taskRepeat : c.eventRepeat);
     show($("#remind-field"), isTask ? c.taskRemind : c.eventRemind);
+    syncRemindMode();
     show($("#labels-field"), isTask ? c.taskLabels : c.eventLabels);
     show($("#checklist-field"), isTask && c.checklist);
     show($("#links-field"), isTask && c.taskLinks);
@@ -548,6 +563,23 @@
     const series = !isTask && !!editing?.isOccurrence;
     f.elements.repeat.disabled = series;
     $("#series-hint").hidden = !series;
+  }
+  // Task reminder: none, a time on the due date, or a one-time date and time of its own.
+  function syncRemindMode() {
+    const f = form(), mode = f.elements.remindMode.value;
+    f.elements.remindTime.hidden = mode !== "due";
+    f.elements.remindAt.hidden = mode !== "custom";
+    if (mode === "due" && !f.elements.remindTime.value) f.elements.remindTime.value = "09:00";
+    if (mode === "custom" && !f.elements.remindAt.value) {
+      const d = f.elements.date.value && f.elements.date.value >= today() ? f.elements.date.value : today();
+      f.elements.remindAt.value = `${d}T09:00`;
+    }
+  }
+  function taskRemindValue() {
+    const f = form(), mode = f.elements.remindMode.value;
+    if (mode === "due") return f.elements.remindTime.value || "09:00";
+    if (mode === "custom") return f.elements.remindAt.value.slice(0, 16);
+    return "";
   }
   function renderLabelsEdit() {
     $("#label-chips").innerHTML = ed.labels.map((l, k) => `<span class="lchip"><span class="dot" style="background:${labelColor(l)}"></span>${esc(l)}<button type="button" class="x" data-label-del="${k}" aria-label="×">×</button></span>`).join("");
@@ -650,7 +682,7 @@
       startTime: source === "event" ? f.elements.startTime.value : "",
       endTime: source === "event" ? f.elements.endTime.value : "",
       repeat: f.elements.repeat.disabled ? editing?.repeat || "" : f.elements.repeat.value,
-      remind: source === "task" ? f.elements.remindTime.value : f.elements.remindMin.value,
+      remind: source === "task" ? taskRemindValue() : f.elements.remindMin.value,
       labels: ed.labels,
       checklist: source === "task" ? ed.checklist.filter((c) => c.text.trim()) : [],
       links: source === "task" ? ed.links : [],
@@ -880,9 +912,37 @@
 
     // Main view interactions
     const view = $("#view");
+    // Long-press a card or row on a phone: choose where to move it.
+    let pressTimer = null, pressStart = null, longPressed = false;
+    view.addEventListener("pointerdown", (e) => {
+      longPressed = false;
+      if (e.pointerType !== "touch") return;
+      const el = e.target.closest(".card[data-key], .tr[data-key]");
+      if (!el || e.target.closest("button, input, select")) return;
+      pressStart = { x: e.clientX, y: e.clientY };
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => {
+        const item = findItem(el.dataset.key); if (!item) return;
+        longPressed = true;
+        navigator.vibrate?.(15);
+        openMenu(el, "status", item);
+      }, 450);
+    });
+    const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+    view.addEventListener("pointermove", (e) => { if (pressStart && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 10) cancelPress(); });
+    view.addEventListener("pointerup", cancelPress);
+    view.addEventListener("pointercancel", cancelPress);
+    view.addEventListener("contextmenu", (e) => { if (TOUCH && e.target.closest(".card, .tr")) e.preventDefault(); });
     view.addEventListener("click", (e) => {
+      if (longPressed) { longPressed = false; e.preventDefault(); e.stopPropagation(); return; }
       const menuBtn = e.target.closest("[data-menu]");
       if (menuBtn) { e.stopPropagation(); return openMenu(menuBtn, menuBtn.dataset.menu, findItem(menuBtn.dataset.key)); }
+      const jump = e.target.closest("[data-col-jump]");
+      if (jump) {
+        const board = $(".board"), col = $(`#col-${jump.dataset.colJump}`);
+        if (board && col) board.scrollBy({ left: col.getBoundingClientRect().left - board.getBoundingClientRect().left, behavior: "smooth" });
+        return;
+      }
       if (e.target.closest(".cell-sel")) return;
       const nav = e.target.closest("[data-cal-nav]");
       if (nav) return calNavigate(Number(nav.dataset.calNav));
@@ -944,11 +1004,13 @@
     f.addEventListener("submit", (e) => { e.preventDefault(); submitEditor(); });
     f.elements.source.onchange = () => {
       // Carry the reminder across when switching type.
-      if (f.elements.source.value === "event") f.elements.remindMin.value = f.elements.remindTime.value ? "15" : "";
+      if (f.elements.source.value === "event") f.elements.remindMin.value = f.elements.remindMode.value ? "15" : "";
+      else if (f.elements.remindMin.value) f.elements.remindMode.value = "due";
       fillContainers(f.elements.source.value, f.elements.containerId.value);
       syncEditorType();
     };
     f.elements.containerId.onchange = () => { syncEditorType(); loadFiles(); };
+    f.elements.remindMode.onchange = syncRemindMode;
     $("#btn-cancel").onclick = () => $("#editor").close();
     $("#btn-delete").onclick = async () => {
       const it = editing;
@@ -1023,7 +1085,8 @@
     wire();
     renderProfiles();
     // Several people set up and this device hasn't said who it is yet.
-    if (window.TB.profiles.length > 1 && !window.TB.profile && !cfg.DEMO_ONLY) { $("#profiles").hidden = false; return; }
+    const demo = cfg.DEMO_ONLY || new URLSearchParams(location.search).has("demo");
+    if (window.TB.profiles.length > 1 && !window.TB.profile && !demo) { $("#profiles").hidden = false; return; }
     if (!cfg.DEMO_ONLY && "serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
     if (cfg.DEMO_ONLY || new URLSearchParams(location.search).has("demo")) {
       if (cfg.DEMO_ONLY) $("#btn-signout").hidden = true;
