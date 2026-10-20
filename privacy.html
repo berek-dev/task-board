@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Task Board – Privacy Policy</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <style>
+    :root { --bg: #f6f7fb; --surface: #fff; --text: #1f2330; --muted: #6b7185; --accent: #5b5bd6; color-scheme: light; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #15161c; --surface: #1e2029; --text: #e8e9ef; --muted: #9aa0b4; --accent: #7c7cf0; color-scheme: dark; } }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-left)); }
+    .card { background: var(--surface); border-radius: 14px; padding: 24px 28px; box-shadow: 0 1px 2px rgba(20,20,40,.06), 0 4px 16px rgba(20,20,40,.06); }
+    h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 18px; margin: 24px 0 6px; }
+    .muted { color: var(--muted); font-size: 14px; } a { color: var(--accent); }
+    header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-weight: 600; }
+    code { font-size: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <header><img src="icons/icon.svg" alt="" width="32" height="32"> <a href="./">Task Board</a></header>
+  <div class="card">
+    <h1>Privacy Policy</h1>
+    <p class="muted">Last updated: October 20, 2026</p>
+
+    <p>Task Board is a free task board that shows your own calendar events and task lists as a table, a board
+    and a calendar. It runs entirely in your web browser. This page explains what it does with your data.</p>
+
+    <h2>What the app accesses</h2>
+    <p>Only after you sign in and agree, and only for your own account:</p>
+    <ul>
+      <li><strong>Google:</strong> your Google Calendar events (<code>calendar.events</code>) and Google Tasks (<code>tasks</code>).</li>
+      <li><strong>Microsoft:</strong> your Outlook calendar (<code>Calendars.ReadWrite</code>), Microsoft To Do (<code>Tasks.ReadWrite</code>) and your basic profile (<code>User.Read</code>).</li>
+    </ul>
+
+    <h2>How it is used</h2>
+    <p>The app reads your events and tasks to display them, and writes the changes you make (for example a new
+    task, a status, a date or the order on the Priorities tab) back to your own Google or Microsoft account.
+    It does nothing with your data other than what you ask it to do on screen.</p>
+
+    <h2>Where your data is stored</h2>
+    <p>Your events and tasks stay in your own Google or Microsoft account. Task Board has <strong>no server and no
+    database</strong>: your browser talks directly to Google and Microsoft. The app's developer never receives,
+    stores or sees your calendar, tasks or sign-in details.</p>
+    <p>Your browser keeps a few things on your device so the app works: a temporary sign-in token, your language,
+    and display settings such as filters and saved views. Signing out removes the sign-in token.</p>
+
+    <h2>Sharing</h2>
+    <p>Your data is not sold, shared with anyone, used for advertising, or used to train AI models.
+    Task Board's use of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
+    including the Limited Use requirements.</p>
+
+    <h2>Removing access</h2>
+    <p>Sign out in the app at any time. To revoke the app's access completely, remove "Task Board" at
+    <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> (Google) or
+    <a href="https://myapplications.microsoft.com" target="_blank" rel="noopener">myapplications.microsoft.com</a> (Microsoft).</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy: use the developer contact email shown on the Google sign-in screen, or open an
+    issue at <a href="https://github.com/berek-dev/task-board/issues" target="_blank" rel="noopener">github.com/berek-dev/task-board</a>.</p>
+  </div>
+</main>
+</body>
+</html>
