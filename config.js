@@ -13,11 +13,11 @@ window.TM_CONFIG = {
   EVENTS_PAST_DAYS: 30,
   EVENTS_FUTURE_DAYS: 120,
 
-  // People who use the app. Each profile can have its own Client IDs, and keeps its own sign-in,
-  // settings and saved views on each device. Anything set here overrides the values above.
-  // With more than one profile, the app asks "Who's using Task Board?" the first time on each device.
-  PROFILES: [
-    { id: "barak", name: "Barak", GOOGLE_CLIENT_ID: "79752309754-ptmlufk15tf041o2nl20jrk60kd0ft6i.apps.googleusercontent.com" },
-    { id: "user2", name: "Second user", GOOGLE_CLIENT_ID: "112739680940-884mqga50ne5f80ubbc2mtostbdegpbb.apps.googleusercontent.com" },
-  ],
+  // Google (Google Calendar + Google Tasks): the OAuth Client ID from Google Cloud (see google-setup.md).
+  // One Client ID serves everyone: each person signs in with their own Google account and sees only their own data.
+  GOOGLE_CLIENT_ID: "79752309754-ptmlufk15tf041o2nl20jrk60kd0ft6i.apps.googleusercontent.com",
+
+  // Optional: only if several people share one device and want to switch without signing out, list them here,
+  // e.g. PROFILES: [{ id: "barak", name: "Barak" }, { id: "dana", name: "Dana" }]. Each profile keeps its own
+  // sign-in, settings and saved views on that device.
 };

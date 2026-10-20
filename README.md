@@ -119,21 +119,14 @@ Add the resulting URL as a redirect URI in your app registration (step 2).
 
 ## More than one person
 
-Everyone can use the same address. Each person signs in with their own account and only sees their
-own calendar and tasks. To keep people apart on a shared device, or to give each person their own
-Client IDs, list them under `PROFILES` in `config.js`:
+Everyone can use the same address with the same Client IDs. Each person signs in with their own account
+and only sees their own calendar and tasks. For Google, add each person's Gmail as a test user (or publish
+the app); for Microsoft, use a multitenant registration (see microsoft-setup.md).
 
-```js
-PROFILES: [
-  { id: "barak", name: "Barak", GOOGLE_CLIENT_ID: "…" },
-  { id: "user2", name: "Second user", GOOGLE_CLIENT_ID: "…" },
-],
-```
-
-The first time the app opens on a device it asks "Who's using Task Board?". Each profile keeps its own
-sign-in, settings and saved views, and the "👤 Name · Switch" button changes person.
-One Google or Microsoft Client ID can also serve everyone: add each person as a Google test user,
-and for Microsoft use a multitenant registration (see microsoft-setup.md).
+Only if several people share one device and want to switch without signing out, list them under
+`PROFILES` in `config.js` (for example `PROFILES: [{ id: "barak", name: "Barak" }, { id: "dana", name: "Dana" }]`).
+The app then asks "Who's using Task Board?" on each device, and each profile keeps its own sign-in,
+settings and saved views there.
 
 ## Security
 
