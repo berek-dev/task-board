@@ -27,9 +27,12 @@ browser language is Hebrew; the English / עברית button in the top bar switc
 - **Repeat and reminders:** tasks and events can repeat (daily, weekdays, weekly, monthly, yearly) and
   have a reminder. Outlook and To Do send the reminder notifications to your phone themselves.
   Completing a repeating task makes To Do create the next one.
-- **Labels:** colored tags on tasks and events, saved as Outlook categories, so you see them in Outlook too.
-- **Filters and saved views:** filter by status, priority, date and label; group the table by list,
-  status, priority, due date or label; sort by date, priority, status or name. Ready-made views
+- **Tags:** free-text tags on tasks and events, each in a category (Work, Personal, Other, or your own).
+  Chips are colored by category; filter or group the table by category, and use **Manage tags** in the
+  filter panel to move a tag to another category or remove it everywhere. In Outlook a tag shows as a
+  category named like `Work › Clients`; in Google it's kept in the task's notes line or the event's hidden fields.
+- **Filters and saved views:** filter by status, priority, date, tag and category; group the table by list,
+  status, priority, due date, category or tag; sort by date, priority, status or name. Ready-made views
   (This week, Overdue, Stuck, High priority) and your own saved views. Saved views are kept on each device.
 - **Links and files:** web links on tasks, and file attachments (up to 3 MB) on tasks and events.
 - **Priorities:** a tab with all your open tasks in one list. Drag ⠿ (or tap ⤒) to put them in order; the
@@ -54,7 +57,7 @@ browser language is Hebrew; the English / עברית button in the top bar switc
 | Subtasks | Checklist steps | (tasks only) |
 | Repeat | To Do recurrence | Outlook recurrence (a single occurrence's pattern is changed in Outlook) |
 | Reminder | To Do reminder time on the due date | Outlook reminder (minutes before) |
-| Labels | Categories | Categories |
+| Tags | Categories (`Work › Name`) | Categories (`Work › Name`) |
 | Links | Linked resources | (tasks only) |
 | Files | Task attachments | Event attachments |
 
@@ -147,10 +150,10 @@ settings and saved views there.
 - If you edit a meeting someone else organized, Outlook may refuse changes to its title or time;
   status changes always work.
 - Recurring events appear as individual occurrences; a status applies to that occurrence only.
-- For Google items, subtasks, labels, links, files and task repeat/reminders aren't available,
+- For Google items, subtasks, links, files and task repeat/reminders aren't available,
   because the Google Tasks API doesn't support them. The edit window hides those fields for Google items.
 - Moving a task between a To Do list and a Google list creates it in the other account and deletes
-  the original, so To Do-only details (subtasks, labels, files) don't carry over to Google.
+  the original, so To Do-only details (subtasks, files) don't carry over to Google.
 - Google's browser sign-in lasts an hour; after that a yellow banner asks you to tap to reconnect Google,
   and your Outlook items stay on screen meanwhile.
 

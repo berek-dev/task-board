@@ -79,10 +79,12 @@
       <label><span data-i18n="col.status">Status</span> <select id="f-status"></select></label>
       <label><span data-i18n="col.priority">Priority</span> <select id="f-priority"></select></label>
       <label><span data-i18n="col.date">Date</span> <select id="f-due"></select></label>
-      <label><span data-i18n="filter.label">Label</span> <select id="f-label"></select></label>
+      <label><span data-i18n="filter.category">Category</span> <select id="f-category"></select></label>
+      <label><span data-i18n="filter.label">Tag</span> <select id="f-label"></select></label>
       <label class="table-only"><span data-i18n="filter.groupBy">Group by</span> <select id="f-group"></select></label>
       <label><span data-i18n="filter.sortBy">Sort by</span> <select id="f-sort"></select></label>
       <button id="btn-clear-filters" class="btn ghost small" data-i18n="filter.clear">Clear filters</button>
+      <button id="btn-tags" class="btn ghost small" data-i18n="tags.manage">🏷 Manage tags</button>
     </div>
 
     <div id="views-bar" class="views-bar"></div>
@@ -140,8 +142,9 @@
       <p id="series-hint" class="hint" data-i18n="edit.seriesHint" hidden></p>
 
       <div id="labels-field" class="field">
-        <span class="field-label" data-i18n="edit.labels">Labels</span>
-        <div class="chips-edit"><span id="label-chips"></span><input id="label-input" list="label-options" dir="auto" data-i18n-placeholder="edit.labelAdd" placeholder="+ Add label"></div>
+        <span class="field-label" data-i18n="edit.labels">Tags</span>
+        <div class="chips-edit"><span id="label-chips"></span><input id="label-input" list="label-options" dir="auto" data-i18n-placeholder="edit.labelAdd" placeholder="+ Add tag"></div>
+        <div class="tag-add-row"><span class="muted" data-i18n="tags.inCategory">Category for new tags:</span> <select id="label-cat" aria-label="Category"></select></div>
         <datalist id="label-options"></datalist>
       </div>
 
@@ -178,6 +181,16 @@
         <button type="submit" class="btn primary" data-i18n="edit.save">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Manage tags: change a tag's category or remove it everywhere -->
+  <dialog id="tags-dialog">
+    <div class="tags-dlg">
+      <h2 data-i18n="tags.title">Tags</h2>
+      <p class="hint" data-i18n="tags.hint">Pick a category for each tag. The change is saved on every task that has the tag.</p>
+      <div id="tags-list" class="tags-list"></div>
+      <div class="dialog-actions"><span class="spacer"></span><button class="btn primary" id="btn-tags-close" data-i18n="keys.close">Close</button></div>
+    </div>
   </dialog>
 
   <!-- Keyboard shortcuts -->

@@ -4,7 +4,7 @@
   "use strict";
   const {
     t, STATUSES, ALL_PRIORITIES, PRIORITY_RANK, STATUS_RANK, REPEATS, REMIND_MINUTES, EVENTS_GROUP,
-    ymd, today, addDays, toMin, fromMin, esc, newId, isNewId, sameJson, labelColor, normalize, safeStore, MAX_ATTACHMENT_BYTES,
+    ymd, today, addDays, toMin, fromMin, esc, newId, isNewId, sameJson, labelColor, splitTag, joinTag, catLabel, catColor, BUILTIN_CATS, normalize, safeStore, MAX_ATTACHMENT_BYTES,
   } = window.TB;
   const { GoogleBackend, MicrosoftBackend, DemoBackend, CombinedBackend } = window.TBBackends;
   const cfg = window.TM_CONFIG || {};
@@ -14,7 +14,7 @@
   const GROUP_COLORS = ["#5b5bd6", "#e2445c", "#fdab3d", "#00c875", "#a25ddc", "#ff7575", "#579bfc"];
   const STORAGE_PREFS = "tb.prefs";
   const START_H = 6, END_H = 23, HOUR_PX = 48; // calendar week grid: 06:00–23:00
-  const EMPTY_FILTERS = { status: "", priority: "", due: "", label: "" };
+  const EMPTY_FILTERS = { status: "", priority: "", due: "", label: "", category: "" };
   const PRESET_VIEWS = [
     { id: "p:week", nameKey: "view.week", filters: { due: "week" } },
     { id: "p:overdue", nameKey: "view.overdue", filters: { due: "overdue" } },
@@ -45,6 +45,12 @@
   const statusOf = (id) => STATUSES.find((s) => s.id === id) || STATUSES[0];
   const priorityOf = (id) => PRIORITIES.find((p) => p.id === (id || "")) || PRIORITIES[0];
   const findItem = (key) => state.items.find((i) => i.key === key);
+  // Categories in use: the three built-in ones first, then any of your own.
+  const allCategories = () => {
+    const own = [...new Set(state.items.flatMap((i) => (i.labels || []).map((l) => splitTag(l).cat)).filter((c) => c && !BUILTIN_CATS.includes(c)))].sort((a, b) => a.localeCompare(b));
+    return [...BUILTIN_CATS, ...own];
+  };
+  const tagText = (l) => { const { cat, name } = splitTag(l); return cat ? `${catLabel(cat)} › ${name}` : name; };
   const allLabels = () => [...new Set(state.items.flatMap((i) => i.labels || []))].sort((a, b) => a.localeCompare(b));
 
   /* ---------- Filtering, sorting, formatting ---------- */
@@ -73,6 +79,7 @@
     if (f.priority && (i.priority || "none") !== f.priority) return false;
     if (f.due && !matchesDue(i, f.due)) return false;
     if (f.label && !(i.labels || []).includes(f.label)) return false;
+    if (f.category && !(f.category === "none" ? !(i.labels || []).some((l) => splitTag(l).cat) : (i.labels || []).some((l) => splitTag(l).cat === f.category))) return false;
     return true;
   }
   const visibleItems = (opts) => state.items.filter((i) => matches(i, opts));
@@ -104,7 +111,7 @@
   }
   const fmtDate = (i) => (i.date ? fmtDay(i.date) + (i.startTime ? " " + i.startTime : "") : "");
   const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
-  const labelChip = (l) => `<span class="lchip"><span class="dot" style="background:${labelColor(l)}"></span>${esc(l)}</span>`;
+  const labelChip = (l) => { const { cat, name } = splitTag(l); return `<span class="lchip" style="--cat:${catColor(cat)}" title="${esc(tagText(l))}"><span class="dot"></span>${esc(name)}</span>`; };
   function badges(i, { labels = true } = {}) {
     const out = [];
     if (i.checklist?.length) {
@@ -155,8 +162,9 @@
     fillSelect($("#f-status"), [["", t("filter.any")], ...STATUSES.map((s) => [s.id, s.label])], f.status);
     fillSelect($("#f-priority"), [["", t("filter.any")], ...PRIORITIES.filter((p) => p.id).map((p) => [p.id, p.label]), ["none", t("priority.noneOption")]], f.priority);
     fillSelect($("#f-due"), [["", t("filter.any")], ...["overdue", "today", "week", "nodate"].map((d) => [d, t("due." + d)])], f.due);
-    fillSelect($("#f-label"), [["", t("filter.any")], ...allLabels().map((l) => [l, l])], f.label);
-    fillSelect($("#f-group"), ["list", "status", "priority", "due", "label"].map((g) => [g, t("group.by." + g)]), prefs.groupBy);
+    fillSelect($("#f-category"), [["", t("filter.any")], ...allCategories().map((c) => [c, catLabel(c)]), ["none", t("cat.none")]], f.category);
+    fillSelect($("#f-label"), [["", t("filter.any")], ...allLabels().map((l) => [l, tagText(l)])], f.label);
+    fillSelect($("#f-group"), ["list", "status", "priority", "due", "category", "label"].map((g) => [g, t("group.by." + g)]), prefs.groupBy);
     fillSelect($("#f-sort"), ["date", "rank", "priority", "status", "title"].map((s) => [s, t("sort." + s)]), prefs.sortBy);
     $$(".table-only", $("#filter-panel")).forEach((el) => (el.hidden = prefs.view !== "table"));
     const n = Object.values(f).filter(Boolean).length;
@@ -190,8 +198,12 @@
         mk("du:none", t("due.nodate"), "var(--muted)", items.filter((i) => !i.date)),
         mk("du:done", t("status.done"), "var(--s-done)", items.filter((i) => i.status === "done" && i.date && i.date < today())),
       ];
+      case "category": return [
+        ...allCategories().map((c) => mk("ct:" + c, catLabel(c), catColor(c), items.filter((i) => (i.labels || []).some((l) => splitTag(l).cat === c)))),
+        mk("ct:", t("cat.none"), "var(--muted)", items.filter((i) => !(i.labels || []).some((l) => splitTag(l).cat))),
+      ].filter((g) => g.items.length);
       case "label": return [
-        ...allLabels().map((l) => mk("lb:" + l, l, labelColor(l), items.filter((i) => (i.labels || []).includes(l)))),
+        ...allLabels().map((l) => mk("lb:" + l, tagText(l), catColor(splitTag(l).cat), items.filter((i) => (i.labels || []).includes(l)))),
         mk("lb:", t("filter.noLabel"), "var(--muted)", items.filter((i) => !(i.labels || []).length)),
       ];
       default:
@@ -462,6 +474,34 @@
     view.addEventListener("pointercancel", end);
   }
 
+  /* ----- Manage tags ----- */
+  function openTagsDialog() {
+    const tags = allLabels().sort((a, b) => splitTag(a).name.localeCompare(splitTag(b).name));
+    const cats = allCategories();
+    $("#tags-list").innerHTML = tags.length ? tags.map((l) => {
+      const { cat, name } = splitTag(l), n = state.items.filter((i) => (i.labels || []).includes(l)).length;
+      const opts = [...cats.map((c) => [c, catLabel(c)]), ["", t("cat.none")], ["__new", t("cat.new")]];
+      return `<div class="tag-row"><span class="lchip" style="--cat:${catColor(cat)}"><span class="dot"></span>${esc(name)}</span>
+        <span class="muted">${esc(t("tags.count", { n }))}</span>
+        <select data-tag-cat="${esc(l)}" aria-label="${esc(t("filter.category"))}">${opts.map(([v, lb]) => `<option value="${esc(v)}"${v === cat ? " selected" : ""}>${esc(lb)}</option>`).join("")}</select>
+        <button class="btn ghost small" data-tag-del="${esc(l)}">${esc(t("tags.remove"))}</button></div>`;
+    }).join("") : `<p class="muted">${esc(t("tags.empty"))}</p>`;
+    if (!$("#tags-dialog").open) $("#tags-dialog").showModal();
+  }
+  // Renames a tag on every item that has it (null removes it). One save per item.
+  async function retag(from, to) {
+    const items = state.items.filter((i) => (i.labels || []).includes(from));
+    if (items.length > 1) toast(t("tags.saving", { n: items.length }));
+    for (const it of items) {
+      const labels = [...new Set(it.labels.map((l) => (l === from ? to : l)).filter(Boolean))];
+      await saveItem(it, { ...it, labels });
+    }
+    if (prefs.filters.label === from) { prefs.filters.label = to || ""; savePrefs(); }
+    render();
+    if ($("#tags-dialog").open) openTagsDialog();
+  }
+  const recategorize = (label, cat) => { const to = joinTag(cat, splitTag(label).name); return to === label ? null : retag(label, to); };
+
   /* ----- Overview ----- */
   function renderOverview() {
     const all = visibleItems({ ignoreHideDone: true });
@@ -631,7 +671,8 @@
     $("#btn-delete").hidden = !item;
     $("#btn-block").hidden = !(item && item.source === "task");
     f.elements.source.disabled = !taskGroups.length || !!item?.isOccurrence;
-    $("#label-options").innerHTML = allLabels().map((l) => `<option value="${esc(l)}">`).join("");
+    $("#label-options").innerHTML = [...new Set(allLabels().map((l) => splitTag(l).name))].map((n) => `<option value="${esc(n)}">`).join("");
+    fillCatSelect();
     $("#label-input").value = ""; $("#checklist-add").value = ""; $("#link-url").value = ""; $("#link-title").value = "";
     renderLabelsEdit(); renderChecklistEdit(); renderLinksEdit(); loadFiles();
     syncEditorType();
@@ -686,10 +727,29 @@
     return "";
   }
   function renderLabelsEdit() {
-    $("#label-chips").innerHTML = ed.labels.map((l, k) => `<span class="lchip"><span class="dot" style="background:${labelColor(l)}"></span>${esc(l)}<button type="button" class="x" data-label-del="${k}" aria-label="×">×</button></span>`).join("");
+    $("#label-chips").innerHTML = ed.labels.map((l, k) => { const { cat, name } = splitTag(l); return `<span class="lchip" style="--cat:${catColor(cat)}" title="${esc(tagText(l))}"><span class="dot"></span>${cat ? `<span class="lcat">${esc(catLabel(cat))}</span>` : ""}${esc(name)}<button type="button" class="x" data-label-del="${k}" aria-label="×">×</button></span>`; }).join("");
+  }
+  let lastCat = safeStore.get("tb.lastCat") ?? "Work";
+  function fillCatSelect(selected = lastCat) {
+    const cats = allCategories();
+    if (selected && !cats.includes(selected)) cats.push(selected);
+    fillSelect($("#label-cat"), [...cats.map((c) => [c, catLabel(c)]), ["", t("cat.none")], ["__new", t("cat.new")]], selected);
+  }
+  // A tag typed with "Category › Name" keeps that category; otherwise it gets the chosen one.
+  // A name already used elsewhere keeps the category it has there.
+  function resolveTag(raw, cat) {
+    const text = String(raw || "").replace(/,/g, " ").trim();
+    if (!text) return "";
+    const typed = splitTag(text);
+    if (typed.cat) return joinTag(typed.cat, typed.name);
+    const existing = allLabels().find((l) => splitTag(l).name.toLowerCase() === text.toLowerCase());
+    return existing && cat === undefined ? existing : joinTag(cat ?? "", text);
   }
   function addLabel(raw) {
-    const l = String(raw || "").replace(/,/g, " ").trim();
+    const name = String(raw || "").trim();
+    if (!name) return;
+    const existing = allLabels().find((l) => splitTag(l).name.toLowerCase() === name.toLowerCase());
+    const l = existing && !splitTag(name).cat ? existing : resolveTag(name, $("#label-cat").value);
     if (l && !ed.labels.includes(l)) { ed.labels.push(l); renderLabelsEdit(); }
   }
   function renderChecklistEdit() {
@@ -986,6 +1046,7 @@
     $("#f-priority").onchange = setFilter("priority");
     $("#f-due").onchange = setFilter("due");
     $("#f-label").onchange = setFilter("label");
+    $("#f-category").onchange = setFilter("category");
     $("#f-group").onchange = (e) => { prefs.groupBy = e.target.value; savePrefs(); e.target.blur(); render(); };
     $("#f-sort").onchange = (e) => { prefs.sortBy = e.target.value; savePrefs(); e.target.blur(); render(); };
     $("#btn-clear-filters").onclick = () => { prefs.filters = { ...EMPTY_FILTERS }; savePrefs(); render(); };
@@ -1097,7 +1158,8 @@
       if (e.key !== "Enter") return;
       const l = e.target.value.trim(); if (!l) return;
       e.target.value = "";
-      applyBulk((i) => (i.source === "task" ? caps(i).taskLabels : caps(i).eventLabels) && !(i.labels || []).includes(l) && { ...i, labels: [...(i.labels || []), l] });
+      const tag = resolveTag(l);
+      applyBulk((i) => (i.source === "task" ? caps(i).taskLabels : caps(i).eventLabels) && !(i.labels || []).includes(tag) && { ...i, labels: [...(i.labels || []), tag] });
     };
     $("#bulk-delete").onclick = async () => {
       const items = [...state.selected].map(findItem).filter(Boolean);
@@ -1132,7 +1194,32 @@
     $("#label-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addLabel(e.target.value); e.target.value = ""; }
     });
-    $("#label-input").addEventListener("change", (e) => { if (allLabels().includes(e.target.value)) { addLabel(e.target.value); e.target.value = ""; } });
+    $("#label-input").addEventListener("change", (e) => { if (allLabels().some((l) => splitTag(l).name === e.target.value)) { addLabel(e.target.value); e.target.value = ""; } });
+    $("#label-cat").addEventListener("change", async (e) => {
+      if (e.target.value !== "__new") { lastCat = e.target.value; safeStore.set("tb.lastCat", lastCat); return; }
+      const name = (await ask(t("cat.namePrompt"), { input: true }))?.replace(/›/g, "").trim();
+      if (name) { lastCat = name; safeStore.set("tb.lastCat", lastCat); }
+      fillCatSelect(lastCat);
+    });
+    $("#btn-tags").onclick = openTagsDialog;
+    $("#btn-tags-close").onclick = () => $("#tags-dialog").close();
+    $("#tags-list").addEventListener("change", (e) => {
+      const sel = e.target.closest("[data-tag-cat]"); if (!sel) return;
+      if (sel.value === "__new") {
+        ask(t("cat.namePrompt"), { input: true }).then((n) => {
+          n = n?.replace(/›/g, "").trim();
+          if (n) recategorize(sel.dataset.tagCat, n); else openTagsDialog();
+        });
+        return;
+      }
+      recategorize(sel.dataset.tagCat, sel.value);
+    });
+    $("#tags-list").addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-tag-del]"); if (!b) return;
+      const tag = b.dataset.tagDel, n = state.items.filter((i) => (i.labels || []).includes(tag)).length;
+      if (!(await ask(t("tags.removeConfirm", { name: tagText(tag), n }), { danger: true }))) return;
+      await retag(tag, null);
+    });
     $("#label-chips").addEventListener("click", (e) => {
       const b = e.target.closest("[data-label-del]");
       if (b) { ed.labels.splice(Number(b.dataset.labelDel), 1); renderLabelsEdit(); }

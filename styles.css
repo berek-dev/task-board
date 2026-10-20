@@ -291,7 +291,10 @@ form.is-task .row3 { grid-template-columns: 1fr; }
 .badge { font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 99px; padding: 1px 7px; white-space: nowrap; }
 .badge.full { color: var(--s-done); font-weight: 600; }
 .lchip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text); border: 1px solid var(--border); border-radius: 99px; padding: 1px 8px; white-space: nowrap; background: var(--surface); }
-.lchip .dot { width: 8px; height: 8px; }
+.lchip .dot { width: 8px; height: 8px; background: var(--cat, var(--accent)); }
+.lchip { border-color: color-mix(in srgb, var(--cat, var(--border)) 45%, var(--border)); background: color-mix(in srgb, var(--cat, transparent) 10%, var(--surface)); }
+.lchip .lcat { color: var(--cat); font-weight: 600; }
+.lchip .lcat::after { content: " ›"; color: var(--muted); font-weight: 400; }
 .lchip .x { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
 .card .meta .badges { max-width: none; }
 
@@ -543,4 +546,20 @@ body.prio-dragging { user-select: none; -webkit-user-select: none; cursor: grabb
   .topbar .seg.views { grid-template-columns: repeat(5, 1fr); }
   .topbar .seg.views button { font-size: 11px; }
   .topbar .seg.views [data-view="priorities"]::before { content: "⇅"; }
+}
+
+/* ---------- Tags with categories ---------- */
+.tag-add-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.tag-add-row select { width: auto; flex: 0 1 200px; padding: 6px 8px; }
+#tags-dialog { width: min(560px, calc(100vw - 24px)); }
+.tags-dlg { display: grid; gap: 12px; padding: 20px; }
+.tags-dlg h2 { margin: 0; font-size: 19px; }
+.tags-dlg .hint { margin: 0; }
+.tags-list { display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.tag-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(110px, 160px) auto; gap: 8px; align-items: center; }
+.tag-row .lchip { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 13px; padding: 3px 10px; }
+.tag-row select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; background: var(--bg); width: 100%; }
+@media (max-width: 720px) {
+  .tag-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tag-row .muted { justify-self: end; }
 }

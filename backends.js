@@ -8,7 +8,7 @@
  *                    the board status lives in a hidden extended property.
  *
  * Google (Google Calendar + Google Tasks): fewer features, because the Google Tasks API has no
- *   hidden fields, labels, subtask checklists, recurrence or reminders.
+ *   hidden fields, subtask checklists, recurrence or reminders.
  *   Task  -> Done = completed; other statuses + priority in a last line of the notes,
  *            e.g. "#taskboard status=working priority=high".
  *   Event -> status + priority in private extendedProperties; reminders and recurrence are native.
@@ -63,11 +63,12 @@
     for (const part of m[1].trim().split(/\s+/)) { const [k, v] = part.split("="); if (k && v) meta[k] = v; }
     return { notes: text.slice(0, m.index).replace(/\s+$/, ""), meta };
   }
-  function buildNotes(notes, status, priority, rank) {
+  function buildNotes(notes, status, priority, rank, labels) {
     const parts = [];
     if (status && status !== "todo" && status !== "done") parts.push(`status=${status}`);
     if (priority) parts.push(`priority=${priority}`);
     if (rank != null) parts.push(`rank=${rank}`);
+    if (labels?.length) parts.push(`tags=${labels.map(encodeURIComponent).join(",")}`);
     const body = (notes || "").replace(/\s+$/, "");
     if (!parts.length) return body;
     return (body ? body + "\n\n" : "") + "#taskboard " + parts.join(" ");
@@ -76,7 +77,7 @@
   class GoogleBackend {
     constructor() {
       this.name = "google";
-      this.caps = { eventRepeat: true, eventRemind: true };
+      this.caps = { eventRepeat: true, eventRemind: true, taskLabels: true, eventLabels: true };
       this.token = null;
       this.calendarId = cfg.CALENDAR_ID || "primary";
     }
@@ -181,13 +182,14 @@
       status: done ? "done" : (meta.status && meta.status !== "done" ? meta.status : "todo"),
       priority: meta.priority || "",
       rank: meta.rank != null && isFinite(meta.rank) ? Number(meta.rank) : null,
+      labels: meta.tags ? meta.tags.split(",").map((x) => { try { return decodeURIComponent(x); } catch { return x; } }).filter(Boolean) : [],
       date: x.due ? x.due.slice(0, 10) : "", link: x.webViewLink || "",
     });
   }
   function itemToGTask(item) {
     return {
       title: item.title,
-      notes: buildNotes(item.notes, item.status, item.priority, item.rank),
+      notes: buildNotes(item.notes, item.status, item.priority, item.rank, item.labels),
       status: item.status === "done" ? "completed" : "needsAction",
       due: item.date ? item.date + "T00:00:00.000Z" : null,
     };
@@ -208,6 +210,7 @@
       title: e.summary || t("item.noTitle"), notes: e.description || "",
       status: STATUSES.some((s) => s.id === p.tbStatus) ? p.tbStatus : "todo",
       priority: p.tbPriority || "",
+      labels: (() => { try { const l = JSON.parse(p.tbLabels || "[]"); return Array.isArray(l) ? l : []; } catch { return []; } })(),
       date, startTime, endTime, link: e.htmlLink || "",
       isOccurrence: !!e.recurringEventId,
       remind: override ? String(override.minutes) : "",
@@ -219,7 +222,7 @@
       summary: item.title, description: item.notes || "",
       start: tm.allDay ? { date: tm.date } : { dateTime: tm.start, timeZone: tz },
       end: tm.allDay ? { date: tm.endDate } : { dateTime: tm.end, timeZone: tz },
-      extendedProperties: { private: { tbStatus: item.status, tbPriority: item.priority || "" } },
+      extendedProperties: { private: { tbStatus: item.status, tbPriority: item.priority || "", tbLabels: JSON.stringify(item.labels || []) } },
     };
     if (changed(prev, item, "remind")) {
       out.reminders = item.remind ? { useDefault: false, overrides: [{ method: "popup", minutes: Number(item.remind) }] } : { useDefault: true };
@@ -573,21 +576,21 @@
       const c = (text, done) => ({ id: newId("c"), text, done });
       this.items = [
         mk("task", "work", t("demo.1"), "working", "high", d(2), {
-          notes: t("demo.1n"), labels: [t("demo.lQ4")],
+          notes: t("demo.1n"), labels: [window.TB.joinTag("Work", t("demo.lQ4"))],
           checklist: [c(t("demo.c1"), true), c(t("demo.c2"), true), c(t("demo.c3"), false), c(t("demo.c4"), false)],
           links: [{ id: newId("l"), url: "https://example.com/q4-report", title: t("demo.link1") }],
         }),
-        mk("task", "work", t("demo.2"), "stuck", "medium", d(-1), { labels: [t("demo.lClients")] }),
-        mk("task", "work", t("demo.3"), "todo", "low", d(6), { labels: [t("demo.lQ4")] }),
+        mk("task", "work", t("demo.2"), "stuck", "medium", d(-1), { labels: [window.TB.joinTag("Work", t("demo.lClients"))] }),
+        mk("task", "work", t("demo.3"), "todo", "low", d(6), { labels: [window.TB.joinTag("Work", t("demo.lQ4"))] }),
         mk("task", "work", t("demo.4"), "done", "medium", d(-3), { repeat: "monthly" }),
         mk("task", "home", t("demo.5"), "todo", "medium", d(4), { remind: "09:00" }),
-        mk("task", "home", t("demo.6"), "working", "high", d(1), { labels: [t("demo.lFamily")] }),
+        mk("task", "home", t("demo.6"), "working", "high", d(1), { labels: [window.TB.joinTag("Personal", t("demo.lFamily"))] }),
         mk("task", "home", t("demo.7"), "todo", "", ""),
         mk("task", "home", t("demo.12"), "todo", "", d(0), { repeat: "weekly", remind: "08:00" }),
         mk("event", EVENTS_GROUP, t("demo.8"), "todo", "", d(1), { startTime: "10:00", endTime: "10:45", isOccurrence: true, remind: "15" }),
         mk("event", EVENTS_GROUP, t("demo.9"), "todo", "medium", d(3), { startTime: "16:30", endTime: "17:15", remind: "60" }),
-        mk("event", EVENTS_GROUP, t("demo.10"), "working", "high", d(9), { labels: [t("demo.lQ4")] }),
-        mk("event", EVENTS_GROUP, t("demo.11"), "done", "", d(-2), { startTime: "14:00", endTime: "15:00", labels: [t("demo.lClients")] }),
+        mk("event", EVENTS_GROUP, t("demo.10"), "working", "high", d(9), { labels: [window.TB.joinTag("Work", t("demo.lQ4"))] }),
+        mk("event", EVENTS_GROUP, t("demo.11"), "done", "", d(-2), { startTime: "14:00", endTime: "15:00", labels: [window.TB.joinTag("Work", t("demo.lClients"))] }),
         mk("event", EVENTS_GROUP, t("demo.13"), "todo", "", d(0), { startTime: "12:30", endTime: "13:30" }),
       ];
     }

@@ -45,6 +45,19 @@
     return LABEL_COLORS[h % LABEL_COLORS.length];
   }
 
+  // Tags are free text with an optional category, stored as one label "Category › Name" so the
+  // category travels with the tag to Outlook / Google and to every device. No category: just "Name".
+  const TAG_SEP = " › ";
+  const BUILTIN_CATS = ["Work", "Personal", "Other"];
+  const CAT_COLORS = { Work: "#579bfc", Personal: "#00c875", Other: "#a25ddc" };
+  function splitTag(label) {
+    const s = String(label || ""), i = s.indexOf(TAG_SEP);
+    return i > 0 ? { cat: s.slice(0, i).trim(), name: s.slice(i + TAG_SEP.length).trim() } : { cat: "", name: s.trim() };
+  }
+  const joinTag = (cat, name) => (cat ? `${cat}${TAG_SEP}${name}` : name);
+  const catLabel = (cat) => (!cat ? t("cat.none") : BUILTIN_CATS.includes(cat) ? t("cat." + cat.toLowerCase()) : cat);
+  const catColor = (cat) => (!cat ? "var(--muted)" : CAT_COLORS[cat] || labelColor(cat));
+
   // The date a repeating item moves to after it is completed.
   function nextRepeatDate(date, repeat) {
     const base = date || today();
@@ -112,7 +125,7 @@
   window.TB = {
     t, STATUSES, ALL_PRIORITIES, MS_PRIORITIES, PRIORITY_RANK, STATUS_RANK, REPEATS, REMIND_MINUTES, EVENTS_GROUP,
     pad, ymd, today, addDays, toMin, fromMin, plusHour, localTz, esc, newId, isNewId, sameJson,
-    labelColor, nextRepeatDate, normalize, AuthError, loadScript, fileToBase64, safeStore,
+    labelColor, splitTag, joinTag, catLabel, catColor, BUILTIN_CATS, nextRepeatDate, normalize, AuthError, loadScript, fileToBase64, safeStore,
     profiles, profile, chooseProfile,
     MAX_ATTACHMENT_BYTES: 3 * 1024 * 1024,
   };
