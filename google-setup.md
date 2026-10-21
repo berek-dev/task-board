@@ -31,11 +31,12 @@ Your app's address: **https://berek-dev.github.io/task-board/**
    - Agree to the policy, then click **Create**.
 3. Go to **Audience** (or "Test users"). Under **Test users**, click **Add users** and add your own Gmail address. Add your wife's Google address too if she'll use Google. Click **Save**.
    - Leave the app in **Testing** mode. You don't need to publish it or get it verified for your own family's use. Up to 100 test users are allowed.
-4. Go to **Data Access** (or "Scopes"), click **Add or remove scopes**, and in the filter box add these two:
+4. Go to **Data Access** (or "Scopes"), click **Add or remove scopes**, and in the filter box add these:
    - `https://www.googleapis.com/auth/calendar.events`
    - `https://www.googleapis.com/auth/tasks`
+   - `https://www.googleapis.com/auth/calendar.calendarlist.readonly` (lets the app show your shared and subscribed calendars too)
 
-   Tick both, then click **Update** and **Save**.
+   Tick them, then click **Update** and **Save**.
 
 ## Step 4: Create the Client ID
 

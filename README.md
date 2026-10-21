@@ -145,7 +145,8 @@ settings and saved views there.
 
 ## Known limits
 
-- Calendar events load from 30 days ago to 120 days ahead, from your main calendar
+- Calendar events load from 30 days ago to 120 days ahead. Outlook: your main calendar. Google: every calendar
+  ticked in Google Calendar (including shared and subscribed ones; view-only ones can't be edited here)
   (change the range in `config.js`).
 - If you edit a meeting someone else organized, Outlook may refuse changes to its title or time;
   status changes always work.

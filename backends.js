@@ -88,7 +88,7 @@
       await loadScript("https://accounts.google.com/gsi/client");
       this.tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: cfg.GOOGLE_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks",
+        scope: "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/tasks",
         callback: () => {},
       });
     }
@@ -138,22 +138,43 @@
       return out;
     }
     taskUrl(listId, id) { return `https://tasks.googleapis.com/tasks/v1/lists/${enc(listId)}/tasks` + (id ? `/${enc(id)}` : ""); }
-    eventUrl(id) { return `https://www.googleapis.com/calendar/v3/calendars/${enc(this.calendarId)}/events` + (id ? `/${enc(id)}` : ""); }
+    eventUrl(id, calId) { return `https://www.googleapis.com/calendar/v3/calendars/${enc(calId || this.calendarId)}/events` + (id ? `/${enc(id)}` : ""); }
+    // Every calendar ticked in Google Calendar's sidebar (yours, shared, subscribed).
+    // Falls back to the main one if the calendar-list permission wasn't granted.
+    async calendars() {
+      try {
+        const all = await this.pages("https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader&maxResults=250");
+        const cals = all.filter((c) => c.primary || (c.selected && !c.hidden && !c.deleted));
+        cals.sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0));
+        if (cals.length) return cals.map((c) => ({ id: c.primary ? this.calendarId : c.id, name: c.summaryOverride || c.summary, readOnly: !["owner", "writer"].includes(c.accessRole), primary: !!c.primary }));
+      } catch (e) { if (e.auth) throw e; }
+      return [{ id: this.calendarId, primary: true, readOnly: false }];
+    }
 
     async load() {
       const lists = await this.pages("https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=100");
       const now = Date.now();
       const min = new Date(now - (cfg.EVENTS_PAST_DAYS ?? 30) * 864e5).toISOString();
       const max = new Date(now + (cfg.EVENTS_FUTURE_DAYS ?? 120) * 864e5).toISOString();
-      const [taskSets, events] = await Promise.all([
+      const cals = await this.calendars();
+      const [taskSets, eventSets] = await Promise.all([
         Promise.all(lists.map((l) => this.pages(this.taskUrl(l.id) + "?showCompleted=true&showHidden=true&maxResults=100"))),
-        this.pages(this.eventUrl() + `?singleEvents=true&orderBy=startTime&maxResults=250&timeMin=${enc(min)}&timeMax=${enc(max)}`),
+        // One calendar that can't be read (e.g. removed sharing) shouldn't hide the others.
+        Promise.all(cals.map((c) => this.pages(this.eventUrl("", c.id) + `?singleEvents=true&orderBy=startTime&maxResults=250&timeMin=${enc(min)}&timeMax=${enc(max)}`)
+          .catch((e) => { if (c.primary || e.auth) throw e; console.warn("Calendar skipped:", c.name, e.message); return []; }))),
       ]);
       const groups = lists.map((l) => ({ id: l.id, title: l.title, source: "task" }));
       groups.push({ id: EVENTS_GROUP, titleKey: "group.calendar", source: "event" });
       const items = [];
       lists.forEach((l, i) => taskSets[i].forEach((x) => { if (!x.deleted && x.title) items.push(gTaskToItem(x, l.id)); }));
-      events.forEach((e) => { if (e.status !== "cancelled") items.push(gEventToItem(e)); });
+      const seen = new Set();
+      cals.forEach((c, i) => eventSets[i].forEach((e) => {
+        // The same meeting can sit on two of your calendars; show it once.
+        const dup = (e.iCalUID || e.id) + "@" + (e.start?.dateTime || e.start?.date);
+        if (e.status === "cancelled" || seen.has(dup)) return;
+        seen.add(dup);
+        items.push(gEventToItem(e, c));
+      }));
       return { groups, items };
     }
     async create(item) {
@@ -167,10 +188,12 @@
         return created;
       }
       if (item.source === "task") return gTaskToItem(await this.api("PATCH", this.taskUrl(item.containerId, item.id), itemToGTask(item)), item.containerId);
-      return gEventToItem(await this.api("PATCH", this.eventUrl(item.id), itemToGEvent(prev, item)));
+      if (prev.readOnly) throw new Error(t("event.readOnly", { cal: prev.calName || "" }));
+      return gEventToItem(await this.api("PATCH", this.eventUrl(item.id, prev.calId), itemToGEvent(prev, item)), prev.calId ? { id: prev.calId, name: prev.calName } : null);
     }
     async remove(item) {
-      await this.api("DELETE", item.source === "task" ? this.taskUrl(item.containerId, item.id) : this.eventUrl(item.id));
+      if (item.source === "event" && item.readOnly) throw new Error(t("event.readOnly", { cal: item.calName || "" }));
+      await this.api("DELETE", item.source === "task" ? this.taskUrl(item.containerId, item.id) : this.eventUrl(item.id, item.calId));
     }
   }
   function gTaskToItem(x, listId) {
@@ -194,7 +217,7 @@
       due: item.date ? item.date + "T00:00:00.000Z" : null,
     };
   }
-  function gEventToItem(e) {
+  function gEventToItem(e, cal) {
     const p = e.extendedProperties?.private || {};
     let date = "", startTime = "", endTime = "";
     if (e.start?.date) date = e.start.date;
@@ -206,7 +229,8 @@
     }
     const override = e.reminders && !e.reminders.useDefault ? e.reminders.overrides?.[0] : null;
     return normalize({
-      key: "event:" + e.id, id: e.id, source: "event", containerId: EVENTS_GROUP,
+      key: "event:" + (cal && !cal.primary ? cal.id + "/" : "") + e.id, id: e.id, source: "event", containerId: EVENTS_GROUP,
+      ...(cal && !cal.primary ? { calId: cal.id, calName: cal.name || "", readOnly: !!cal.readOnly } : {}),
       title: e.summary || t("item.noTitle"), notes: e.description || "",
       status: STATUSES.some((s) => s.id === p.tbStatus) ? p.tbStatus : "todo",
       priority: p.tbPriority || "",
